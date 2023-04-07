@@ -240,7 +240,7 @@ class MyCNN(nn.Module):
 		x = x.view(x.size(0), -1)
 		logits = self.fc(x)
 
-		probs = F.softmax(logits, dim = 1)
+		# probs = F.softmax(logits, dim = 1)
 
 		return probs
 
