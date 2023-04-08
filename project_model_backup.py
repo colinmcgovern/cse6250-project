@@ -20,10 +20,6 @@ from gensim.models import Word2Vec
 import re
 import numpy as np
 import torch.nn.functional as F
-import matplotlib.pyplot as plt
-from sklearn import metrics
-import random
-from collections import Counter
 
 PATH_OUTPUT = "."
 NUM_EPOCHS = 50
@@ -54,29 +50,25 @@ df=pd.read_csv(file_location)
 regex = re.compile('[^a-zA-Z\s]')
 for i in range(0,len(df)):
 	df.iloc[i][1] = regex.sub(' ', df.iloc[i][1]).replace('gt','').split()
-df = df.sample(frac=1)[0:200] #For testing
-
-#for testing
-# label_counts = Counter(df.iloc[:,2].values)
-# smallest_count = min(label_counts.values())
-# all_labels = label_counts.keys()
-# new_df = pd.DataFrame()
-# for label in all_labels:
-# 	to_add = df[df['Label']==label][0:smallest_count]
-# 	if(len(new_df)==0):
-# 		new_df = to_add
-# 	else:
-# 		new_df = new_df.append(to_add, ignore_index = True)
-# df = new_df.sample(frac=1)
-#for testing
+df = df[0:11] #DEL
 
 longest_post = 0
 for i in range(0,len(df)):
 	if(len(df.iloc[i][1])>longest_post):
 		longest_post = len(df.iloc[i][1])
+print("longest_post")
+print(longest_post)
 
 def convert_posts(posts):
 	new_posts = [[0]*300]*longest_post
+	#del
+	# print('len(new_posts)')
+	# print(len(new_posts))
+	# print('len(posts)')
+	# print(len(posts))
+	# print('posts')
+	# print(posts)
+	#del
 	for i in range(0,len(posts)):
 		key = '/c/en/' + posts[i].lower()
 		if key in key_to_index.keys():
@@ -85,15 +77,39 @@ def convert_posts(posts):
 
 class MyDataset():
 	def __init__(self):
+
+		# self.x_train = torch.empty((len(x),len(x[0]),300),dtype=torch.float64)
+		# print(self.x_train.size())
+		# for i in range(0,len(x)):
+		# 	for j in range(0,len(x[0])):
+		# 		for k in range(0,len(x[0][0])):
+		# 			self.x_train[i,j,k] = x[i][j][k]
+
+		# x=df.iloc[:,1].map(convert_posts)
+		# x = x.map(lambda i: i.flatten())
+		# x = np.vstack(x).astype(np.float64)
+		# self.x_train=torch.from_numpy(x)
+		# self.x_train=torch.unsqueeze(torch.squeeze(self.x_train),1)
+
 		x=df.iloc[:,1].map(convert_posts)
 		x2 = []
 		for i in x:
 			x2.append(torch.from_numpy(i))
+			print(torch.from_numpy(i.astype(np.float64)).size())
 		# self.x_train=torch.cat(x2, dim=2)
 		self.x_train=torch.stack((x2))
+		print("self.x_train")
+		print(self.x_train.size())
+
 		y=df.iloc[:,2].values
 		y=[string_to_num[i] for i in y]
 		self.y_train=torch.tensor(y,dtype=torch.float64)
+		#del
+		# print('x_train.size()')
+		# print(self.x_train.size())
+		# print('y_train.size()')
+		# print(self.y_train.size())
+		#del
 	def __len__(self):
 		return len(self.y_train)
 	def __getitem__(self,idx):
@@ -128,6 +144,11 @@ def train(model_param, device, data_loader, criterion, optimizer, epoch, print_f
 	losses = AverageMeter()
 	accuracy = AverageMeter()
 	model_param.train()
+	#del
+	print("summary(model_param)")
+	for name, param in model_param.named_parameters():
+		print(name, param.data.size())
+	#del
 	end = time.time()
 	for i, (input, target) in enumerate(data_loader):
 		# measure data loading time
@@ -139,18 +160,7 @@ def train(model_param, device, data_loader, criterion, optimizer, epoch, print_f
 		target = target.to(device)
 		optimizer.zero_grad()
 		output = model_param(input.float())
-
-		print("train")
-		print("input {}".format(input))
-		print("output {}".format(output))
-		print(type(output))
-		print(list(map(lambda x: x.index(max(x)),output.tolist())))
-		print("target {}".format(target.long()))
-		print(type(target))
-
 		loss = criterion(output, target.long())
-		print("loss")
-		print(loss)
 		assert not np.isnan(loss.item()), 'Model diverged with loss = NaN'
 		loss.backward()
 		optimizer.step()
@@ -185,18 +195,7 @@ def evaluate(model_param, device, data_loader, criterion, print_freq=10):
 				input = input.to(device)
 			target = target.to(device)
 			output = model_param(input.float())
-
-			print("evaluate")
-			print("input {}".format(input))
-			print("output {}".format(output))
-			print(type(output))
-			print(list(map(lambda x: x.index(max(x)),output.tolist())))
-			print("target {}".format(target))
-			print(type(target))
-
 			loss = criterion(output, target.long())
-			print("loss")
-			print(loss)
 			# measure elapsed time
 			batch_time.update(time.time() - end)
 			end = time.time()
@@ -249,57 +248,70 @@ def plot_confusion_matrix(results, class_names):
 	plt.savefig("confusion.png",pad_inches=0, dpi=199)
 	pass
 
+# class MyCNN(nn.Module):
+# 	def __init__(self):
+# 		super(MyCNN, self).__init__()
+# 		# self.conv1 = Conv1d(in_channels=300*longest_post,
+# 		# out_channels=100, kernel_size=3, stride=1)
+# 		self.conv1 = Conv1d(in_channels=1,
+# 			out_channels=100, kernel_size=3, stride=1)
+# 		self.conv2 = Conv1d(in_channels=100,
+# 			out_channels=100, kernel_size=4, stride=1)
+# 		self.conv3 = Conv1d(in_channels=100,
+# 			out_channels=100, kernel_size=5, stride=1)
+# 		self.pool1 = MaxPool1d(kernel_size=2)
+# 		self.drop = Dropout(0.3)
+# 		self.fc2 = Linear(128, 5)
+# 	def forward(self, x):
+# 		# print("x")
+# 		# print(x.size())
+# 		# exit()
+# 		x = self.conv1(x)
+# 		x = relu(x)
+# 		x = self.pool1(x)
+
+# 		x = self.conv2(x)
+# 		x = relu(x)
+# 		x = self.pool1(x)
+
+# 		x = self.conv3(x)
+# 		x = relu(x)
+# 		x = self.pool1(x)
+
+# 		x = self.drop(x)
+# 		x = self.fc2(x)
+# 		return x
+
 class MyCNN(nn.Module):
-	def __init__(self, num_classes=5, window_sizes=(3,4,5)):
+	def __init__(self, num_classes=5, window_sizes=(1,2,3,5)):
 		super(MyCNN, self).__init__()
 
+		# like a python list, it was designed to store any desired number of nn.Module
 		self.convs = nn.ModuleList([
 			nn.Conv2d(1, 100, [window_size, 300], padding=(window_size - 1, 0))
 			for window_size in window_sizes
 		])
-
-		self.drop = Dropout(0.3)
 	
 		self.fc = nn.Linear(100 * len(window_sizes), num_classes)
-
-		# self.fc1 = nn.Linear(300,100)
-		# self.fc2 = nn.Linear(100,100)
-		# self.fc3 = nn.Linear(100,100)
-		# self.fc4 = nn.Linear(100,num_classes)
 
 	def forward(self, x):
 
 		x = torch.unsqueeze(x, 1)
 		xs = []
 		for conv in self.convs:
-			x2 = torch.relu(conv(x))
+			x2 = torch.tanh(conv(x))
 			x2 = torch.squeeze(x2, -1)
 			x2 = F.max_pool1d(x2, x2.size(2))
 			xs.append(x2)
 		x = torch.cat(xs, 2)
 
-		# x = torch.unsqueeze(x, 1)
-		# xs = []
-		# for conv in self.convs:
-		# 	x2 = torch.tanh(conv(x))
-		# 	x2 = torch.squeeze(x2, -1)
-		# 	x2 = F.max_pool1d(x2, x2.size(2))
-		# 	xs.append(x2)
-		# x = torch.cat(xs, 2)
-
-		x = self.drop(x)
+		# FC
 		x = x.view(x.size(0), -1)
-		x = self.fc(x)
+		logits = self.fc(x)
 
-		# LEAVE OFF!!!
-		# x = F.softmax(x, dim = 1)
+		probs = F.softmax(logits, dim = 1)
 
-		# x = self.fc1(x)
-		# x = self.fc2(x)
-		# x = self.fc3(x)
-		# x = self.fc4(x)
-
-		return x
+		return probs
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(1)
@@ -308,14 +320,9 @@ if device.type == "cuda":
 	torch.backends.cudnn.benchmark = False
 
 CNN_model = MyCNN()
-print('CNN_model')
-print(CNN_model)
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(CNN_model.parameters())
-
-print("CNN_model.parameters()")
-print(CNN_model.parameters())
 
 CNN_model.to(device)
 criterion.to(device)
@@ -324,78 +331,16 @@ best_val_acc = 0.0
 train_losses, train_accuracies = [], []
 valid_losses, valid_accuracies = [], []
 
-VALID_FRACTION = 4
-valid_size = int(len(df)/VALID_FRACTION)
-test_size = int(len(df)/VALID_FRACTION)
+valid_size = int(len(df)/10)
+test_size = int(len(df)/10)
 train_size = len(df)-valid_size-test_size
-
-print('valid_size')
-print(valid_size)
-print('test_size')
-print(test_size)
-print('train_size')
-print(train_size)
 
 train_loader, valid_loader, test_loader = torch.utils.data.random_split(MyDataset(), [train_size,valid_size,test_size])
 train_loader = DataLoader(train_loader, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 valid_loader = DataLoader(valid_loader, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 test_loader = DataLoader(test_loader, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 
-# train_size = len(df)
-# # train_loader, valid_loader, test_loader = torch.utils.data.random_split(MyDataset(), [train_size,0,0])
-# train_loader = DataLoader(MyDataset(), batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-# valid_loader = train_loader
-# test_loader = train_loader
-
-
-
-# a, b = MyDataset()
-# c = TensorDataset(a,b)
-# train_loader = DataLoader(MyDataset(), batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-# valid_loader = DataLoader(MyDataset(), batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-# test_loader = DataLoader(MyDataset(), batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-
-#del
-# print('train_loader')
-# for data, targets in train_loader:
-# 	print('data')
-# 	print(data)
-# 	print('targets')
-# 	print(targets)
-
-# print('valid_loader')
-# for data, targets in valid_loader:
-# 	print('data')
-# 	print(data)
-# 	print('targets')
-# 	print(targets)
-
-# print('test_loader')
-# for data, targets in test_loader:
-# 	print('data')
-# 	print(data)
-# 	print('targets')
-# 	print(targets)
-
-#del
-
-print("train_loader")
-for data, targets in train_loader:
-	print('data')
-	print(data)
-	print('targets')
-	print(targets)
-
-print("valid_loader")
-for data, targets in valid_loader:
-	print('data')
-	print(data)
-	print('targets')
-	print(targets)
-
 for epoch in range(NUM_EPOCHS):
-	print("epoch: {}".format(epoch))
-
 	train_loss, train_accuracy = train(CNN_model, device, train_loader, criterion, optimizer, epoch)
 	valid_loss, valid_accuracy, valid_results = evaluate(CNN_model, device, valid_loader, criterion)
 
@@ -405,7 +350,7 @@ for epoch in range(NUM_EPOCHS):
 	train_accuracies.append(train_accuracy)
 	valid_accuracies.append(valid_accuracy)
 
-	is_best = valid_accuracy > best_val_acc
+	is_best = valid_accuracy > best_val_acc  # let's keep the CNN_model that has the best accuracy, but you can also use another metric.
 	if is_best:
 		best_val_acc = valid_accuracy
 		torch.save(CNN_model, os.path.join(PATH_OUTPUT, save_file), _use_new_zipfile_serialization=False)
