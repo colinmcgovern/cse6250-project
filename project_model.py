@@ -294,10 +294,14 @@ class MyCNN(nn.Module):
 		# LEAVE OFF!!!
 		# x = F.softmax(x, dim = 1)
 
+<<<<<<< HEAD
 		# x = self.fc1(x)
 		# x = self.fc2(x)
 		# x = self.fc3(x)
 		# x = self.fc4(x)
+=======
+		# probs = F.softmax(logits, dim = 1)
+>>>>>>> dfc1e8abe51cc4dc96645cf1d0abcb455616cc97
 
 		return x
 
