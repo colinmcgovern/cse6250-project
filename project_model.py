@@ -294,14 +294,11 @@ class MyCNN(nn.Module):
 		# LEAVE OFF!!!
 		# x = F.softmax(x, dim = 1)
 
-<<<<<<< HEAD
 		# x = self.fc1(x)
 		# x = self.fc2(x)
 		# x = self.fc3(x)
 		# x = self.fc4(x)
-=======
 		# probs = F.softmax(logits, dim = 1)
->>>>>>> dfc1e8abe51cc4dc96645cf1d0abcb455616cc97
 
 		return x
 
@@ -420,3 +417,21 @@ best_CNN_model = torch.load(os.path.join(PATH_OUTPUT, save_file))
 test_loss, test_accuracy, test_results = evaluate(best_CNN_model, device, test_loader, criterion)
 
 plot_confusion_matrix(test_results, string_to_num.keys())
+
+
+def fold_testing(dataset=MyDataset(), fold=5):
+	train_loader, valid_loader, test_loader = torch.utils.data.random_split(dataset, [train_size,test_size])
+	train_loader = DataLoader(train_loader, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+	test_loader = DataLoader(valid_loader, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+
+def precision():
+	return 0
+
+def recall():
+	return 0
+
+def f_score():
+	return 0
+
+def ord_error():
+	return 0
