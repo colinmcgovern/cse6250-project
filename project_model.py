@@ -321,117 +321,88 @@ print(CNN_model.parameters())
 CNN_model.to(device)
 criterion.to(device)
 
-best_val_acc = 0.0
-train_losses, train_accuracies = [], []
-valid_losses, valid_accuracies = [], []
-
-VALID_FRACTION = 4
-valid_size = int(len(df)/VALID_FRACTION)
-test_size = int(len(df)/VALID_FRACTION)
-train_size = len(df)-valid_size-test_size
-
-print('valid_size')
-print(valid_size)
-print('test_size')
-print(test_size)
-print('train_size')
-print(train_size)
-
-train_loader, valid_loader, test_loader = torch.utils.data.random_split(MyDataset(), [train_size,valid_size,test_size])
-train_loader = DataLoader(train_loader, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-valid_loader = DataLoader(valid_loader, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-test_loader = DataLoader(test_loader, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-
-# train_size = len(df)
-# # train_loader, valid_loader, test_loader = torch.utils.data.random_split(MyDataset(), [train_size,0,0])
-# train_loader = DataLoader(MyDataset(), batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-# valid_loader = train_loader
-# test_loader = train_loader
-
-
-
-# a, b = MyDataset()
-# c = TensorDataset(a,b)
-# train_loader = DataLoader(MyDataset(), batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-# valid_loader = DataLoader(MyDataset(), batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-# test_loader = DataLoader(MyDataset(), batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-
-#del
-# print('train_loader')
-# for data, targets in train_loader:
-# 	print('data')
-# 	print(data)
-# 	print('targets')
-# 	print(targets)
-
-# print('valid_loader')
-# for data, targets in valid_loader:
-# 	print('data')
-# 	print(data)
-# 	print('targets')
-# 	print(targets)
-
-# print('test_loader')
-# for data, targets in test_loader:
-# 	print('data')
-# 	print(data)
-# 	print('targets')
-# 	print(targets)
-
-#del
-
-print("train_loader")
-for data, targets in train_loader:
-	print('data')
-	print(data)
-	print('targets')
-	print(targets)
-
-print("valid_loader")
-for data, targets in valid_loader:
-	print('data')
-	print(data)
-	print('targets')
-	print(targets)
-
-for epoch in range(NUM_EPOCHS):
-	print("epoch: {}".format(epoch))
-
-	train_loss, train_accuracy = train(CNN_model, device, train_loader, criterion, optimizer, epoch)
-	valid_loss, valid_accuracy, valid_results = evaluate(CNN_model, device, valid_loader, criterion)
-
-	train_losses.append(train_loss)
-	valid_losses.append(valid_loss)
-
-	train_accuracies.append(train_accuracy)
-	valid_accuracies.append(valid_accuracy)
-
-	is_best = valid_accuracy > best_val_acc
-	if is_best:
-		best_val_acc = valid_accuracy
-		torch.save(CNN_model, os.path.join(PATH_OUTPUT, save_file), _use_new_zipfile_serialization=False)
-
-plot_learning_curves(train_losses, valid_losses, train_accuracies, valid_accuracies)
-
-best_CNN_model = torch.load(os.path.join(PATH_OUTPUT, save_file))
-test_loss, test_accuracy, test_results = evaluate(best_CNN_model, device, test_loader, criterion)
-
-plot_confusion_matrix(test_results, string_to_num.keys())
-
 
 def fold_testing(dataset=MyDataset(), fold=5):
-	train_loader, valid_loader, test_loader = torch.utils.data.random_split(dataset, [train_size,test_size])
-	train_loader = DataLoader(train_loader, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-	test_loader = DataLoader(valid_loader, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 
-def precision():
-	return 0
+	best_val_acc = 0.0
+	train_losses, train_accuracies = [], []
+	valid_losses, valid_accuracies = [], []
 
-def recall():
-	return 0
+	valid_size = int(len(df)/fold)
+	train_size = len(df)-valid_size
 
-def f_score():
-	return 0
+	print('valid_size')
+	print(valid_size)
+	print('train_size')
+	print(train_size)
 
-def ord_error():
-	return 0
+	for(i in range(fold)):
+		print("####### {} #######".format(i))
+
+		train_loader, valid_loader = torch.utils.data.random_split(dataset, [train_size,valid_size])
+		train_loader = DataLoader(train_loader, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+		valid_loader = DataLoader(valid_loader, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+
+		print("train_loader")
+
+		for epoch in range(NUM_EPOCHS):
+			print("epoch: {}".format(epoch))
+
+			train_loss, train_accuracy = train(CNN_model, device, train_loader, criterion, optimizer, epoch)
+			valid_loss, valid_accuracy, valid_results = evaluate(CNN_model, device, valid_loader, criterion)
+
+			train_losses.append(train_loss)
+			valid_losses.append(valid_loss)
+
+			train_accuracies.append(train_accuracy)
+			valid_accuracies.append(valid_accuracy)
+
+			is_best = valid_accuracy > best_val_acc
+			if is_best:
+				best_val_acc = valid_accuracy
+				torch.save(CNN_model, os.path.join(PATH_OUTPUT, save_file), _use_new_zipfile_serialization=False)
+
+		plot_learning_curves(train_losses, valid_losses, train_accuracies, valid_accuracies)
+
+		best_CNN_model = torch.load(os.path.join(PATH_OUTPUT, save_file))
+		valid_loss, valid_accuracy, valid_results = evaluate(best_CNN_model, device, valid_loader, criterion)
+
+		plot_confusion_matrix(valid_results, string_to_num.keys())
+
+
+def FP(actual,predicted):
+	out = 0
+	for i in range(len(actual)):
+		if(predicted[i]>actual[i]):
+			out = out + 1
+	return float(out)/float(len(actual))
+
+def FN(actual,predicted):
+	out = 0
+	for i in range(len(actual)):
+		if(actual[i]>predicted[i]):
+			out = out + 1
+	return float(out)/float(len(actual))
+
+def TP(actual,predicted):
+	return 1. - FP(actual,predicted)
+
+def TN(actual,predicted):
+	return 1. - FN(actual,predicted)
+
+def precision(actual,predicted):
+	return TP(actual,predicted) / (TP(actual,predicted)+FP(actual,predicted))
+
+def recall(actual,predicted):
+	return TP(actual,predicted) / (TP(actual,predicted)+FN(actual,predicted))
+
+def f_score(actual,predicted):
+	return (2 * TP(actual,predicted)) / ((2 * TP(actual,predicted)) + FP(actual,predicted)+FN(actual,predicted))
+
+def ord_error(actual,predicted):
+	out = 0
+	for i in range(len(actual)):
+		if(actual[i] != predicted[i]):
+			out = out + 1
+	return float(out)/float(len(actual))
+
