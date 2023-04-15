@@ -24,9 +24,13 @@ import matplotlib.pyplot as plt
 from sklearn import metrics
 import random
 from collections import Counter
+import sys
+
+if(argc!=4):
+	print("input is: script.py DATA_SIZE NUM_EPOCHS [SVM-RBF|SVM-L|RF|FFNN|CNN]")
 
 PATH_OUTPUT = "."
-NUM_EPOCHS = 50
+NUM_EPOCHS = int(argv[2])
 BATCH_SIZE = 4
 USE_CUDA = True
 NUM_WORKERS = 0
@@ -54,7 +58,10 @@ df=pd.read_csv(file_location)
 regex = re.compile('[^a-zA-Z\s]')
 for i in range(0,len(df)):
 	df.iloc[i][1] = regex.sub(' ', df.iloc[i][1]).replace('gt','').split()
-df = df.sample(frac=1)[0:200] #For testing
+
+DATA_SIZE = int(sys.argv[1])
+if(DATA_SIZE>0):
+	df = df.sample(frac=1)[0:DATA_SIZE]
 
 #for testing
 # label_counts = Counter(df.iloc[:,2].values)
@@ -321,7 +328,6 @@ print(CNN_model.parameters())
 CNN_model.to(device)
 criterion.to(device)
 
-
 def fold_testing(dataset=MyDataset(), fold=5):
 
 	best_val_acc = 0.0
@@ -336,7 +342,7 @@ def fold_testing(dataset=MyDataset(), fold=5):
 	print('train_size')
 	print(train_size)
 
-	for(i in range(fold)):
+	for i in range(fold):
 		print("####### {} #######".format(i))
 
 		train_loader, valid_loader = torch.utils.data.random_split(dataset, [train_size,valid_size])
@@ -406,3 +412,4 @@ def ord_error(actual,predicted):
 			out = out + 1
 	return float(out)/float(len(actual))
 
+fold_testing()
