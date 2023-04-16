@@ -26,15 +26,16 @@ import random
 from collections import Counter
 import sys
 
-if(argc!=4):
+if(len(sys.argv)!=4):
 	print("input is: script.py DATA_SIZE NUM_EPOCHS [SVM-RBF|SVM-L|RF|FFNN|CNN]")
+	quit()
 
 PATH_OUTPUT = "."
-NUM_EPOCHS = int(argv[2])
+NUM_EPOCHS = int(sys.argv[2])
 BATCH_SIZE = 4
 USE_CUDA = True
 NUM_WORKERS = 0
-save_file = 'MyCNN.pth'
+save_file = '{}.pth'.format(sys.argv[2])
 
 # file_location = "/FileStore/tables/500_Reddit_users_posts_labels.csv" #DATABRICKS
 file_location = "500_Reddit_users_posts_labels.csv" #LOCAL
@@ -342,6 +343,11 @@ def fold_testing(dataset=MyDataset(), fold=5):
 	print('train_size')
 	print(train_size)
 
+	precision_avg = 0
+	recall_avg = 0
+	f_score_avg = 0
+	ord_error_avg = 0
+
 	for i in range(fold):
 		print("####### {} #######".format(i))
 
@@ -368,12 +374,19 @@ def fold_testing(dataset=MyDataset(), fold=5):
 				best_val_acc = valid_accuracy
 				torch.save(CNN_model, os.path.join(PATH_OUTPUT, save_file), _use_new_zipfile_serialization=False)
 
+		precision_avg = precision_avg + precision(actual,predicted)
+		recall_avg = recall_avg + recall(actual,predicted)
+		f_score_avg = f_score_avg + f_score(actual,predicted)
+		ord_error_avg = ord_error_avg + ord_error(actual,predicted)
+
 		plot_learning_curves(train_losses, valid_losses, train_accuracies, valid_accuracies)
 
 		best_CNN_model = torch.load(os.path.join(PATH_OUTPUT, save_file))
 		valid_loss, valid_accuracy, valid_results = evaluate(best_CNN_model, device, valid_loader, criterion)
 
 		plot_confusion_matrix(valid_results, string_to_num.keys())
+
+	print("{} {} {} {}").format(precision_avg,recall_avg,f_score_avg,ord_error_avg)
 
 
 def FP(actual,predicted):
