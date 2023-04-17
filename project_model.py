@@ -26,9 +26,9 @@ import random
 from collections import Counter
 import sys
 
-if(len(sys.argv)!=4):
-	print("input is: script.py DATA_SIZE NUM_EPOCHS [SVM-RBF|SVM-L|RF|FFNN|CNN]")
-	quit()
+# if(len(sys.argv)!=4):
+# 	print("input is: script.py DATA_SIZE NUM_EPOCHS [SVM-RBF|SVM-L|RF|FFNN|CNN]")
+# 	exit()
 
 PATH_OUTPUT = "."
 NUM_EPOCHS = int(sys.argv[2])
@@ -92,20 +92,26 @@ def convert_posts(posts):
 	return np.array(new_posts)
 
 class MyDataset():
-	def __init__(self):
-		x=df.iloc[:,1].map(convert_posts)
+	def __init__(self,start=0,length=-1):
+		if(length==-1):
+			length = len(df)
+		cut_df = df[start:start+length]
+		print("cut_df size is {}".format(len(cut_df)))
+		x=cut_df.iloc[:,1].map(convert_posts)
 		x2 = []
 		for i in x:
 			x2.append(torch.from_numpy(i))
 		# self.x_train=torch.cat(x2, dim=2)
 		self.x_train=torch.stack((x2))
-		y=df.iloc[:,2].values
-		y=[string_to_num[i] for i in y]
-		self.y_train=torch.tensor(y,dtype=torch.float64)
+		self.y=cut_df.iloc[:,2].values
+		self.y=[string_to_num[i] for i in self.y]
+		self.y_train=torch.tensor(self.y,dtype=torch.float64)
 	def __len__(self):
 		return len(self.y_train)
 	def __getitem__(self,idx):
 		return self.x_train[idx],self.y_train[idx]
+	def y(self):
+		return self.y
 
 def compute_batch_accuracy(output, target):
 	"""Computes the accuracy for a batch"""
@@ -270,11 +276,6 @@ class MyCNN(nn.Module):
 	
 		self.fc = nn.Linear(100 * len(window_sizes), num_classes)
 
-		# self.fc1 = nn.Linear(300,100)
-		# self.fc2 = nn.Linear(100,100)
-		# self.fc3 = nn.Linear(100,100)
-		# self.fc4 = nn.Linear(100,num_classes)
-
 	def forward(self, x):
 
 		x = torch.unsqueeze(x, 1)
@@ -286,27 +287,9 @@ class MyCNN(nn.Module):
 			xs.append(x2)
 		x = torch.cat(xs, 2)
 
-		# x = torch.unsqueeze(x, 1)
-		# xs = []
-		# for conv in self.convs:
-		# 	x2 = torch.tanh(conv(x))
-		# 	x2 = torch.squeeze(x2, -1)
-		# 	x2 = F.max_pool1d(x2, x2.size(2))
-		# 	xs.append(x2)
-		# x = torch.cat(xs, 2)
-
 		x = self.drop(x)
 		x = x.view(x.size(0), -1)
 		x = self.fc(x)
-
-		# LEAVE OFF!!!
-		# x = F.softmax(x, dim = 1)
-
-		# x = self.fc1(x)
-		# x = self.fc2(x)
-		# x = self.fc3(x)
-		# x = self.fc4(x)
-		# probs = F.softmax(logits, dim = 1)
 
 		return x
 
@@ -316,17 +299,28 @@ if device.type == "cuda":
 	torch.backends.cudnn.deterministic = True
 	torch.backends.cudnn.benchmark = False
 
-CNN_model = MyCNN()
-print('CNN_model')
-print(CNN_model)
+model_used = ""
+if(sys.argv[3]=="SVM-RBF"):
+	model_used = MySVNRBF()
+elif(sys.argv[3]=="SVM-L"):
+	model_used = MySVML()
+elif(sys.argv[3]=="RF"):
+	model_used = MyRF()
+elif(sys.argv[3]=="FFNN"):
+	model_used = MyFFNN()
+elif(sys.argv[3]=="CNN"):
+	model_used = MyCNN()
+
+print('model_used')
+print(model_used)
 
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(CNN_model.parameters())
+optimizer = optim.Adam(model_used.parameters())
 
-print("CNN_model.parameters()")
-print(CNN_model.parameters())
+print("model_used.parameters()")
+print(model_used.parameters())
 
-CNN_model.to(device)
+model_used.to(device)
 criterion.to(device)
 
 def fold_testing(dataset=MyDataset(), fold=5):
@@ -351,17 +345,23 @@ def fold_testing(dataset=MyDataset(), fold=5):
 	for i in range(fold):
 		print("####### {} #######".format(i))
 
-		train_loader, valid_loader = torch.utils.data.random_split(dataset, [train_size,valid_size])
-		train_loader = DataLoader(train_loader, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-		valid_loader = DataLoader(valid_loader, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+		# train_loader, valid_loader = torch.utils.data.random_split(dataset, [train_size,valid_size])
+		# train_loader = DataLoader(train_loader, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+		# valid_loader = DataLoader(valid_loader, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+
+		train_ds = MyDataset(train_start,train_len)
+		valid_ds = MyDataset(valid_start,valid_len)
+
+		train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+		valid_loader = DataLoader(valid_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 
 		print("train_loader")
 
 		for epoch in range(NUM_EPOCHS):
 			print("epoch: {}".format(epoch))
 
-			train_loss, train_accuracy = train(CNN_model, device, train_loader, criterion, optimizer, epoch)
-			valid_loss, valid_accuracy, valid_results = evaluate(CNN_model, device, valid_loader, criterion)
+			train_loss, train_accuracy = train(model_used, device, train_loader, criterion, optimizer, epoch)
+			valid_loss, valid_accuracy, valid_results = evaluate(model_used, device, valid_loader, criterion)
 
 			train_losses.append(train_loss)
 			valid_losses.append(valid_loss)
@@ -372,19 +372,25 @@ def fold_testing(dataset=MyDataset(), fold=5):
 			is_best = valid_accuracy > best_val_acc
 			if is_best:
 				best_val_acc = valid_accuracy
-				torch.save(CNN_model, os.path.join(PATH_OUTPUT, save_file), _use_new_zipfile_serialization=False)
-
-		precision_avg = precision_avg + precision(actual,predicted)
-		recall_avg = recall_avg + recall(actual,predicted)
-		f_score_avg = f_score_avg + f_score(actual,predicted)
-		ord_error_avg = ord_error_avg + ord_error(actual,predicted)
+				torch.save(model_used, os.path.join(PATH_OUTPUT, save_file), _use_new_zipfile_serialization=False)
 
 		plot_learning_curves(train_losses, valid_losses, train_accuracies, valid_accuracies)
 
-		best_CNN_model = torch.load(os.path.join(PATH_OUTPUT, save_file))
-		valid_loss, valid_accuracy, valid_results = evaluate(best_CNN_model, device, valid_loader, criterion)
+		best_model_used = torch.load(os.path.join(PATH_OUTPUT, save_file))
+		valid_loss, valid_accuracy, valid_results = evaluate(best_model_used, device, valid_loader, criterion)
 
 		plot_confusion_matrix(valid_results, string_to_num.keys())
+
+		precision_avg = precision_avg + precision(actual,valid_results)
+		recall_avg = recall_avg + recall(actual,valid_results)
+		f_score_avg = f_score_avg + f_score(actual,valid_results)
+		ord_error_avg = ord_error_avg + ord_error(actual,valid_results)
+
+		print("fold: {}".format(fold))
+		print("precision: {}".format(precision(actual,valid_results)))
+		print("recall: {}".format(recall(actual,valid_results)))
+		print("f_score: {}".format(f_score(actual,valid_results)))
+		print("ord_error: {}".format(ord_error(actual,valid_results)))
 
 	print("{} {} {} {}").format(precision_avg,recall_avg,f_score_avg,ord_error_avg)
 
