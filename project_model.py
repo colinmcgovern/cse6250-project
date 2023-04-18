@@ -92,10 +92,12 @@ def convert_posts(posts):
 	return np.array(new_posts)
 
 class MyDataset():
-	def __init__(self,start=0,length=-1):
-		if(length==-1):
-			length = len(df)
-		cut_df = df[start:start+length]
+	def __init__(self,start=0,length=0,remove_mode=False):
+		cut_df = df
+		if(remove_mode):
+			cut_df = df[0:start].append(df[start+length:len(df)])
+		else:
+			cut_df = df[start:start+length]
 		print("cut_df size is {}".format(len(cut_df)))
 		x=cut_df.iloc[:,1].map(convert_posts)
 		x2 = []
@@ -227,10 +229,10 @@ def evaluate(model_param, device, data_loader, criterion, print_freq=10):
 					i, len(data_loader), batch_time=batch_time, loss=losses, acc=accuracy))
 	return losses.avg, accuracy.avg, results
 
-def plot_learning_curves(train_losses, valid_losses, train_accuracies, valid_accuracies):
+def plot_learning_curves(train_losses, test_losses, train_accuracies, test_accuracies):
 	plt.figure()
 	plt.plot(np.arange(len(train_losses)), train_losses, label='Train')
-	plt.plot(np.arange(len(valid_losses)), valid_losses, label='Validation')
+	plt.plot(np.arange(len(test_losses)), test_losses, label='Validation')
 	plt.ylabel('Loss')
 	plt.xlabel('epoch')
 	plt.legend(loc="best")
@@ -239,7 +241,7 @@ def plot_learning_curves(train_losses, valid_losses, train_accuracies, valid_acc
 	plt.cla() 
 	plt.figure()
 	plt.plot(np.arange(len(train_accuracies)), train_accuracies, label='Train')
-	plt.plot(np.arange(len(valid_accuracies)), valid_accuracies, label='Validation')
+	plt.plot(np.arange(len(test_accuracies)), test_accuracies, label='Validation')
 	plt.ylabel('Loss')
 	plt.xlabel('epoch')
 	plt.legend(loc="best")
@@ -327,13 +329,13 @@ def fold_testing(dataset=MyDataset(), fold=5):
 
 	best_val_acc = 0.0
 	train_losses, train_accuracies = [], []
-	valid_losses, valid_accuracies = [], []
+	test_losses, test_accuracies = [], []
 
-	valid_size = int(len(df)/fold)
-	train_size = len(df)-valid_size
+	test_size = int(len(df)/fold)
+	train_size = len(df)-test_size
 
-	print('valid_size')
-	print(valid_size)
+	print('test_size')
+	print(test_size)
 	print('train_size')
 	print(train_size)
 
@@ -343,17 +345,21 @@ def fold_testing(dataset=MyDataset(), fold=5):
 	ord_error_avg = 0
 
 	for i in range(fold):
-		print("####### {} #######".format(i))
+		print("####### FOLD: {} #######".format(i))
 
-		# train_loader, valid_loader = torch.utils.data.random_split(dataset, [train_size,valid_size])
-		# train_loader = DataLoader(train_loader, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-		# valid_loader = DataLoader(valid_loader, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+		test_len = int(len(df)/fold)
+		if(start+test_len > len(df)):
+			test_len = len(df)-start_df+test_len
+		train_ds = MyDataset(start,test_len,True)
+		test_ds = MyDataset(start,test_len)
+		start = start + test_len
 
-		train_ds = MyDataset(train_start,train_len)
-		valid_ds = MyDataset(valid_start,valid_len)
+		print("len(train_ds.y) {}".format(len(train_ds.y)))
+		print("len(test_len.y) {}".format(len(test_len.y)))
+		print("sum(test_len.y) {}".format(sum(test_len.y)))
 
 		train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-		valid_loader = DataLoader(valid_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+		test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 
 		print("train_loader")
 
@@ -361,36 +367,36 @@ def fold_testing(dataset=MyDataset(), fold=5):
 			print("epoch: {}".format(epoch))
 
 			train_loss, train_accuracy = train(model_used, device, train_loader, criterion, optimizer, epoch)
-			valid_loss, valid_accuracy, valid_results = evaluate(model_used, device, valid_loader, criterion)
+			test_loss, test_accuracy, test_results = evaluate(model_used, device, test_loader, criterion)
 
 			train_losses.append(train_loss)
-			valid_losses.append(valid_loss)
+			test_losses.append(test_loss)
 
 			train_accuracies.append(train_accuracy)
-			valid_accuracies.append(valid_accuracy)
+			test_accuracies.append(test_accuracy)
 
-			is_best = valid_accuracy > best_val_acc
+			is_best = test_accuracy > best_val_acc
 			if is_best:
-				best_val_acc = valid_accuracy
+				best_val_acc = test_accuracy
 				torch.save(model_used, os.path.join(PATH_OUTPUT, save_file), _use_new_zipfile_serialization=False)
 
-		plot_learning_curves(train_losses, valid_losses, train_accuracies, valid_accuracies)
+		plot_learning_curves(train_losses, test_losses, train_accuracies, test_accuracies)
 
 		best_model_used = torch.load(os.path.join(PATH_OUTPUT, save_file))
-		valid_loss, valid_accuracy, valid_results = evaluate(best_model_used, device, valid_loader, criterion)
+		test_loss, test_accuracy, test_results = evaluate(best_model_used, device, test_loader, criterion)
 
-		plot_confusion_matrix(valid_results, string_to_num.keys())
+		plot_confusion_matrix(test_results, string_to_num.keys())
 
-		precision_avg = precision_avg + precision(actual,valid_results)
-		recall_avg = recall_avg + recall(actual,valid_results)
-		f_score_avg = f_score_avg + f_score(actual,valid_results)
-		ord_error_avg = ord_error_avg + ord_error(actual,valid_results)
+		precision_avg = precision_avg + precision(actual,test_results)
+		recall_avg = recall_avg + recall(actual,test_results)
+		f_score_avg = f_score_avg + f_score(actual,test_results)
+		ord_error_avg = ord_error_avg + ord_error(actual,test_results)
 
 		print("fold: {}".format(fold))
-		print("precision: {}".format(precision(actual,valid_results)))
-		print("recall: {}".format(recall(actual,valid_results)))
-		print("f_score: {}".format(f_score(actual,valid_results)))
-		print("ord_error: {}".format(ord_error(actual,valid_results)))
+		print("precision: {}".format(precision(actual,test_results)))
+		print("recall: {}".format(recall(actual,test_results)))
+		print("f_score: {}".format(f_score(actual,test_results)))
+		print("ord_error: {}".format(ord_error(actual,test_results)))
 
 	print("{} {} {} {}").format(precision_avg,recall_avg,f_score_avg,ord_error_avg)
 
