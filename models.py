@@ -70,49 +70,46 @@ def hinge_loss(y_pred, y_true):
 	# return torch.mean(torch.clamp(1 - y_pred.t() * y_true, min=0))
 	return torch.max(torch.zeros_like(y), 1-y_pred.t()*y_true).mean()
 
-def mypause(interval):
-	backend = plt.rcParams['backend']
-	if backend in matplotlib.rcsetup.interactive_bk:
-		figManager = matplotlib._pylab_helpers.Gcf.get_active()
-		if figManager is not None:
-			canvas = figManager.canvas
-			if canvas.figure.stale:
-				canvas.draw_idle()
-			canvas.start_event_loop(interval)
-			return
+# def mypause(interval):
+# 	backend = plt.rcParams['backend']
+# 	if backend in matplotlib.rcsetup.interactive_bk:
+# 		figManager = matplotlib._pylab_helpers.Gcf.get_active()
+# 		if figManager is not None:
+# 			canvas = figManager.canvas
+# 			if canvas.figure.stale:
+# 				canvas.draw_idle()
+# 			canvas.start_event_loop(interval)
+# 			return
+
+# @callbacks.on_start
+# def scatter(_):
+# 	plt.figure(figsize=(5, 5))
+# 	plt.ion()
+# 	plt.scatter(x=X[:, 0], y=X[:, 1], c="black", s=10)
 
 
-@callbacks.on_start
-def scatter(_):
-	plt.figure(figsize=(5, 5))
-	plt.ion()
-	plt.scatter(x=X[:, 0], y=X[:, 1], c="black", s=10)
+# @callbacks.on_step_training
+# def draw_margin(state):
+# 	if state[torchbearer.BATCH] % 10 == 0:
+# 		w = state[torchbearer.MODEL].w[0].detach().to('cpu').numpy()
+# 		b = state[torchbearer.MODEL].b[0].detach().to('cpu').numpy()
 
+# 		z = (w.dot(xy) + b).reshape(x.shape)
+# 		z[np.where(z > 1.)] = 4
+# 		z[np.where((z > 0.) & (z <= 1.))] = 3
+# 		z[np.where((z > -1.) & (z <= 0.))] = 2
+# 		z[np.where(z <= -1.)] = 1
 
-@callbacks.on_step_training
-def draw_margin(state):
-	if state[torchbearer.BATCH] % 10 == 0:
-		w = state[torchbearer.MODEL].w[0].detach().to('cpu').numpy()
-		b = state[torchbearer.MODEL].b[0].detach().to('cpu').numpy()
+# 		if CONTOUR in state:
+# 			for coll in state[CONTOUR].collections:
+# 				coll.remove()
+# 			state[CONTOUR] = plt.contourf(x, y, z, cmap=plt.cm.jet, alpha=0.5)
+# 		else:
+# 			state[CONTOUR] = plt.contourf(x, y, z, cmap=plt.cm.jet, alpha=0.5)
+# 			plt.tight_layout()
+# 			plt.show()
 
-		z = (w.dot(xy) + b).reshape(x.shape)
-		z[np.where(z > 1.)] = 4
-		z[np.where((z > 0.) & (z <= 1.))] = 3
-		z[np.where((z > -1.) & (z <= 0.))] = 2
-		z[np.where(z <= -1.)] = 1
-
-		if CONTOUR in state:
-			for coll in state[CONTOUR].collections:
-				coll.remove()
-			state[CONTOUR] = plt.contourf(x, y, z, cmap=plt.cm.jet, alpha=0.5)
-		else:
-			state[CONTOUR] = plt.contourf(x, y, z, cmap=plt.cm.jet, alpha=0.5)
-			plt.tight_layout()
-			plt.show()
-
-		mypause(0.001)
-
-
+# 		mypause(0.001)
 
 # CNN ##################################################################################
 class MyCNN(nn.Module):
@@ -145,3 +142,20 @@ class MyCNN(nn.Module):
 
 		return x
 
+# CNN ##################################################################################
+class MyFFNN(nn.Module):
+	def __init__(self, num_classes=5, buffer_size=-1):
+		super(MyFFNN, self).__init__()
+		self.layers = nn.Sequential(
+            nn.Linear(300*buffer_size, 256),
+            nn.ReLU(),
+            nn.Linear(256, 64),
+            nn.ReLU(),
+            nn.Linear(64, num_classes),
+            nn.Sigmoid()
+        )
+		
+	def forward(self, x):
+		x = x.view(x.size(0), -1) 
+		x = self.layers(x)
+		return x

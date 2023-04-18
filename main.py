@@ -30,7 +30,7 @@ from models import *
 
 DATA_SIZE = 10
 NUM_EPOCHS = 3
-MODEL_CHOICE = "SVM-RBF"
+MODEL_CHOICE = "FFNN"
 
 if(len(sys.argv)!=1):
 	DATA_SIZE = int(sys.argv[1])
@@ -93,6 +93,7 @@ longest_post_len = 0
 for i in range(0,len(df)):
 	if(len(df.iloc[i][1])>longest_post_len):
 		longest_post_len = len(df.iloc[i][1])
+print("longest_post_len: {}".format(longest_post_len))
 
 def convert_posts(posts):
 	new_posts = [[0]*300]*longest_post_len
@@ -171,7 +172,13 @@ def train(model_param, device, data_loader, criterion, optimizer, epoch, print_f
 		target = target.to(device)
 		optimizer.zero_grad()
 		output = model_param(input.float())
-		if(len(target.size())==1):
+		print("output")
+		print(output)
+		print(output.size())
+		print("target")
+		print(target)
+		print(target.size())
+		if(target.size()==torch.Size([1])):
 			target = torch.unsqueeze(target,1)
 		loss = criterion(output, target.long())
 		assert not np.isnan(loss.item()), 'Model diverged with loss = NaN'
@@ -207,14 +214,14 @@ def evaluate(model_param, device, data_loader, criterion, print_freq=10):
 				input = input.to(device)
 			target = target.to(device)
 			output = model_param(input.float())
-			if(len(target.size())==1):
-				target = torch.unsqueeze(target,1)
 			print("output")
 			print(output)
 			print(output.size())
 			print("target")
 			print(target)
 			print(target.size())
+			if(target.size()==torch.Size([1])):
+				target = torch.unsqueeze(target,1)
 			loss = criterion(output, target.long())
 			# measure elapsed time
 			batch_time.update(time.time() - end)
@@ -283,7 +290,7 @@ elif(MODEL_CHOICE=="SVM-L"):
 elif(MODEL_CHOICE=="RF"):
 	model_used = MyRF()
 elif(MODEL_CHOICE=="FFNN"):
-	model_used = MyFFNN()
+	model_used = MyFFNN(5,longest_post_len)
 elif(MODEL_CHOICE=="CNN"):
 	model_used = MyCNN()
 else:
@@ -378,10 +385,15 @@ def fold_testing(fold=5):
 		print("f_score: {}".format(f_score(true_output,pred_output)))
 		print("ord_error: {}".format(ord_error(true_output,pred_output)))
 
+	precision_avg = precision_avg / fold
+	recall_avg = recall_avg / fold
+	f_score_avg = f_score_avg / fold
+	ord_error_avg = ord_error_avg / fold
+
 	print("{} {} {} {}".format(precision_avg,recall_avg,f_score_avg,ord_error_avg))
 
 	with open("stats_{}.txt".format(MODEL_CHOICE), "w") as text_file:
-		text_file.write("fold precision recall f_score ord_error")
+		text_file.write("fold precision recall f_score ord_error\n")
 		text_file.write("{} {} {} {}".format(precision_avg,recall_avg,f_score_avg,ord_error_avg))
 
 
