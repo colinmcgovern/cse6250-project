@@ -26,16 +26,27 @@ import random
 from collections import Counter
 import sys
 
+from models import *
+
+DATA_SIZE = 10
+NUM_EPOCHS = 3
+MODEL_CHOICE = "SVM-RBF"
+
+if(len(sys.argv)!=1):
+	DATA_SIZE = int(sys.argv[1])
+	NUM_EPOCHS = int(sys.argv[2])
+	MODEL_CHOICE = sys.argv[3]
+
+
 # if(len(sys.argv)!=4):
 # 	print("input is: script.py DATA_SIZE NUM_EPOCHS [SVM-RBF|SVM-L|RF|FFNN|CNN]")
 # 	exit()
 
 PATH_OUTPUT = "."
-NUM_EPOCHS = int(sys.argv[2])
 BATCH_SIZE = 4
 USE_CUDA = True
 NUM_WORKERS = 0
-save_file = '{}.pth'.format(sys.argv[2])
+save_file = '{}_{}.pth'.format(MODEL_CHOICE,NUM_EPOCHS)
 
 # file_location = "/FileStore/tables/500_Reddit_users_posts_labels.csv" #DATABRICKS
 file_location = "500_Reddit_users_posts_labels.csv" #LOCAL
@@ -60,7 +71,7 @@ regex = re.compile('[^a-zA-Z\s]')
 for i in range(0,len(df)):
 	df.iloc[i][1] = regex.sub(' ', df.iloc[i][1]).replace('gt','').split()
 
-DATA_SIZE = int(sys.argv[1])
+DATA_SIZE = int(DATA_SIZE)
 if(DATA_SIZE>0):
 	df = df.sample(frac=1)[0:DATA_SIZE]
 
@@ -78,13 +89,13 @@ if(DATA_SIZE>0):
 # df = new_df.sample(frac=1)
 #for testing
 
-longest_post = 0
+longest_post_len = 0
 for i in range(0,len(df)):
-	if(len(df.iloc[i][1])>longest_post):
-		longest_post = len(df.iloc[i][1])
+	if(len(df.iloc[i][1])>longest_post_len):
+		longest_post_len = len(df.iloc[i][1])
 
 def convert_posts(posts):
-	new_posts = [[0]*300]*longest_post
+	new_posts = [[0]*300]*longest_post_len
 	for i in range(0,len(posts)):
 		key = '/c/en/' + posts[i].lower()
 		if key in key_to_index.keys():
@@ -92,8 +103,10 @@ def convert_posts(posts):
 	return np.array(new_posts)
 
 class MyDataset():
-	def __init__(self,start=0,length=0,remove_mode=False):
+	def __init__(self,start=0,length=-1,remove_mode=False):
 		cut_df = df
+		if(length==-1):
+			length = len(df)
 		if(remove_mode):
 			cut_df = df[0:start].append(df[start+length:len(df)])
 		else:
@@ -108,10 +121,13 @@ class MyDataset():
 		self.y=cut_df.iloc[:,2].values
 		self.y=[string_to_num[i] for i in self.y]
 		self.y_train=torch.tensor(self.y,dtype=torch.float64)
+		print("self.y_train: {}".format(self.y_train.size()))
 	def __len__(self):
 		return len(self.y_train)
 	def __getitem__(self,idx):
 		return self.x_train[idx],self.y_train[idx]
+	def x(self):
+		return self.x_train
 	def y(self):
 		return self.y
 
@@ -155,18 +171,9 @@ def train(model_param, device, data_loader, criterion, optimizer, epoch, print_f
 		target = target.to(device)
 		optimizer.zero_grad()
 		output = model_param(input.float())
-
-		print("train")
-		print("input {}".format(input))
-		print("output {}".format(output))
-		print(type(output))
-		print(list(map(lambda x: x.index(max(x)),output.tolist())))
-		print("target {}".format(target.long()))
-		print(type(target))
-
+		if(len(target.size())==1):
+			target = torch.unsqueeze(target,1)
 		loss = criterion(output, target.long())
-		print("loss")
-		print(loss)
 		assert not np.isnan(loss.item()), 'Model diverged with loss = NaN'
 		loss.backward()
 		optimizer.step()
@@ -185,7 +192,6 @@ def train(model_param, device, data_loader, criterion, optimizer, epoch, print_f
 				data_time=data_time, loss=losses, acc=accuracy))
 	return losses.avg, accuracy.avg
 
-
 def evaluate(model_param, device, data_loader, criterion, print_freq=10):
 	batch_time = AverageMeter()
 	losses = AverageMeter()
@@ -201,18 +207,15 @@ def evaluate(model_param, device, data_loader, criterion, print_freq=10):
 				input = input.to(device)
 			target = target.to(device)
 			output = model_param(input.float())
-
-			print("evaluate")
-			print("input {}".format(input))
-			print("output {}".format(output))
-			print(type(output))
-			print(list(map(lambda x: x.index(max(x)),output.tolist())))
-			print("target {}".format(target))
-			print(type(target))
-
+			if(len(target.size())==1):
+				target = torch.unsqueeze(target,1)
+			print("output")
+			print(output)
+			print(output.size())
+			print("target")
+			print(target)
+			print(target.size())
 			loss = criterion(output, target.long())
-			print("loss")
-			print(loss)
 			# measure elapsed time
 			batch_time.update(time.time() - end)
 			end = time.time()
@@ -228,6 +231,7 @@ def evaluate(model_param, device, data_loader, criterion, print_freq=10):
 					  'Accuracy {acc.val:.3f} ({acc.avg:.3f})'.format(
 					i, len(data_loader), batch_time=batch_time, loss=losses, acc=accuracy))
 	return losses.avg, accuracy.avg, results
+
 
 def plot_learning_curves(train_losses, test_losses, train_accuracies, test_accuracies):
 	plt.figure()
@@ -245,7 +249,7 @@ def plot_learning_curves(train_losses, test_losses, train_accuracies, test_accur
 	plt.ylabel('Loss')
 	plt.xlabel('epoch')
 	plt.legend(loc="best")
-	plt.savefig("accuracies.png",pad_inches=0)
+	plt.savefig("accuracies_{}.png".format(MODEL_CHOICE),pad_inches=0)
 	pass
 
 def plot_confusion_matrix(results, class_names):
@@ -262,38 +266,8 @@ def plot_confusion_matrix(results, class_names):
 	confusion_matrix = metrics.confusion_matrix(list(out[0]),list(out[1]),normalize='true')
 	cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix = confusion_matrix, display_labels = class_names)
 	cm_display.plot()
-	plt.savefig("confusion.png",pad_inches=0, dpi=199)
+	plt.savefig("confusion_{}.png".format(MODEL_CHOICE),pad_inches=0, dpi=199)
 	pass
-
-class MyCNN(nn.Module):
-	def __init__(self, num_classes=5, window_sizes=(3,4,5)):
-		super(MyCNN, self).__init__()
-
-		self.convs = nn.ModuleList([
-			nn.Conv2d(1, 100, [window_size, 300], padding=(window_size - 1, 0))
-			for window_size in window_sizes
-		])
-
-		self.drop = Dropout(0.3)
-	
-		self.fc = nn.Linear(100 * len(window_sizes), num_classes)
-
-	def forward(self, x):
-
-		x = torch.unsqueeze(x, 1)
-		xs = []
-		for conv in self.convs:
-			x2 = torch.relu(conv(x))
-			x2 = torch.squeeze(x2, -1)
-			x2 = F.max_pool1d(x2, x2.size(2))
-			xs.append(x2)
-		x = torch.cat(xs, 2)
-
-		x = self.drop(x)
-		x = x.view(x.size(0), -1)
-		x = self.fc(x)
-
-		return x
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(1)
@@ -302,30 +276,27 @@ if device.type == "cuda":
 	torch.backends.cudnn.benchmark = False
 
 model_used = ""
-if(sys.argv[3]=="SVM-RBF"):
-	model_used = MySVNRBF()
-elif(sys.argv[3]=="SVM-L"):
-	model_used = MySVML()
-elif(sys.argv[3]=="RF"):
+if(MODEL_CHOICE=="SVM-RBF"):
+	model_used = MySVM(MyDataset().x(),kernel='rbf')
+elif(MODEL_CHOICE=="SVM-L"):
+	model_used = MySVM(MyDataset().x(),kernel='linear')
+elif(MODEL_CHOICE=="RF"):
 	model_used = MyRF()
-elif(sys.argv[3]=="FFNN"):
+elif(MODEL_CHOICE=="FFNN"):
 	model_used = MyFFNN()
-elif(sys.argv[3]=="CNN"):
+elif(MODEL_CHOICE=="CNN"):
 	model_used = MyCNN()
-
-print('model_used')
-print(model_used)
+else:
+	print("BAD MODEL NAME")
+	exit()
 
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model_used.parameters())
-
-print("model_used.parameters()")
-print(model_used.parameters())
+optimizer = optim.Adam(model_used.parameters(),lr=0.001)
 
 model_used.to(device)
 criterion.to(device)
 
-def fold_testing(dataset=MyDataset(), fold=5):
+def fold_testing(fold=5):
 
 	best_val_acc = 0.0
 	train_losses, train_accuracies = [], []
@@ -344,19 +315,21 @@ def fold_testing(dataset=MyDataset(), fold=5):
 	f_score_avg = 0
 	ord_error_avg = 0
 
+	start = 0
+
 	for i in range(fold):
 		print("####### FOLD: {} #######".format(i))
 
 		test_len = int(len(df)/fold)
 		if(start+test_len > len(df)):
-			test_len = len(df)-start_df+test_len
+			test_len = len(df)-start+test_len
 		train_ds = MyDataset(start,test_len,True)
 		test_ds = MyDataset(start,test_len)
 		start = start + test_len
 
 		print("len(train_ds.y) {}".format(len(train_ds.y)))
-		print("len(test_len.y) {}".format(len(test_len.y)))
-		print("sum(test_len.y) {}".format(sum(test_len.y)))
+		print("len(test_ds.y) {}".format(len(test_ds.y)))
+		print("sum(test_ds.y) {}".format(sum(test_ds.y)))
 
 		train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 		test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
@@ -375,7 +348,11 @@ def fold_testing(dataset=MyDataset(), fold=5):
 			train_accuracies.append(train_accuracy)
 			test_accuracies.append(test_accuracy)
 
-			is_best = test_accuracy > best_val_acc
+			print("test_accuracy")
+			print(test_accuracy)
+			print("best_val_acc")
+			print(best_val_acc)
+			is_best = test_accuracy >= best_val_acc
 			if is_best:
 				best_val_acc = test_accuracy
 				torch.save(model_used, os.path.join(PATH_OUTPUT, save_file), _use_new_zipfile_serialization=False)
@@ -387,18 +364,25 @@ def fold_testing(dataset=MyDataset(), fold=5):
 
 		plot_confusion_matrix(test_results, string_to_num.keys())
 
-		precision_avg = precision_avg + precision(actual,test_results)
-		recall_avg = recall_avg + recall(actual,test_results)
-		f_score_avg = f_score_avg + f_score(actual,test_results)
-		ord_error_avg = ord_error_avg + ord_error(actual,test_results)
+		true_output = [i for (i, j) in test_results]
+		pred_output = [j for (i, j) in test_results]
+
+		precision_avg = precision_avg + precision(true_output,pred_output)
+		recall_avg = recall_avg + recall(true_output,pred_output)
+		f_score_avg = f_score_avg + f_score(true_output,pred_output)
+		ord_error_avg = ord_error_avg + ord_error(true_output,pred_output)
 
 		print("fold: {}".format(fold))
-		print("precision: {}".format(precision(actual,test_results)))
-		print("recall: {}".format(recall(actual,test_results)))
-		print("f_score: {}".format(f_score(actual,test_results)))
-		print("ord_error: {}".format(ord_error(actual,test_results)))
+		print("precision: {}".format(precision(true_output,pred_output)))
+		print("recall: {}".format(recall(true_output,pred_output)))
+		print("f_score: {}".format(f_score(true_output,pred_output)))
+		print("ord_error: {}".format(ord_error(true_output,pred_output)))
 
-	print("{} {} {} {}").format(precision_avg,recall_avg,f_score_avg,ord_error_avg)
+	print("{} {} {} {}".format(precision_avg,recall_avg,f_score_avg,ord_error_avg))
+
+	with open("stats_{}.txt".format(MODEL_CHOICE), "w") as text_file:
+		text_file.write("fold precision recall f_score ord_error")
+		text_file.write("{} {} {} {}".format(precision_avg,recall_avg,f_score_avg,ord_error_avg))
 
 
 def FP(actual,predicted):
@@ -422,9 +406,21 @@ def TN(actual,predicted):
 	return 1. - FN(actual,predicted)
 
 def precision(actual,predicted):
+	if(TP(actual,predicted)+FP(actual,predicted)==0):
+		print("TP")
+		print(TP(actual,predicted))
+		print("FP")
+		print(FP(actual,predicted))
+		return -1
 	return TP(actual,predicted) / (TP(actual,predicted)+FP(actual,predicted))
 
 def recall(actual,predicted):
+	if(TP(actual,predicted)+FN(actual,predicted)==0):
+		print("TP")
+		print(TP(actual,predicted))
+		print("FN")
+		print(FN(actual,predicted))
+		return -1
 	return TP(actual,predicted) / (TP(actual,predicted)+FN(actual,predicted))
 
 def f_score(actual,predicted):
