@@ -32,46 +32,46 @@ from torchbearer import Trial
 from torchbearer.callbacks import L2WeightDecay, ExponentialLR
 
 # SVM ##################################################################################
-class MySVM(nn.Module):
-	"""Support Vector Machine"""
+# class MySVM(nn.Module):
+# 	"""Support Vector Machine"""
 
-	def __init__(self, train_data_x, kernel, num_classes=5,
-				gamma_init=1.0, train_gamma=True):
-		super(MySVM,self).__init__()
+# 	def __init__(self, train_data_x, kernel, num_classes=5,
+# 				gamma_init=1.0, train_gamma=True):
+# 		super(MySVM,self).__init__()
 
-		self._train_data_x = train_data_x
+# 		self._train_data_x = train_data_x
 
-		if kernel == 'linear':
-			self._kernel = self.linear
-			self._num_c = train_data_x.size(1) * 300
-		elif kernel == 'rbf':
-			self._kernel = self.rbf
-			self._num_c = train_data_x.size(0)
-			self._gamma = torch.nn.Parameter(torch.FloatTensor([gamma_init]),
-											 requires_grad=train_gamma)
+# 		if kernel == 'linear':
+# 			self._kernel = self.linear
+# 			self._num_c = train_data_x.size(1) * 300
+# 		elif kernel == 'rbf':
+# 			self._kernel = self.rbf
+# 			self._num_c = train_data_x.size(0)
+# 			self._gamma = torch.nn.Parameter(torch.FloatTensor([gamma_init]),
+# 											 requires_grad=train_gamma)
 
-		self._w = torch.nn.Linear(in_features=self._num_c, out_features=num_classes)
+# 		self._w = torch.nn.Linear(in_features=self._num_c, out_features=num_classes)
 
-	def rbf(self, x, gamma=1):
-		y = self._train_data_x.repeat(self._train_data_x.size(0), 1, 1)
-		return torch.exp(-self._gamma*((x[:,None]-y)**2).sum(dim=2))
+# 	def rbf(self, x, gamma=1):
+# 		y = self._train_data_x.repeat(self._train_data_x.size(0), 1, 1)
+# 		return torch.exp(-self._gamma*((x[:,None]-y)**2).sum(dim=2))
 
-	@staticmethod
-	def linear(x):
-		return x
+# 	@staticmethod
+# 	def linear(x):
+# 		return x
 
-	def forward(self, x):
-		# h = x.matmul(self.w.t()) + self.b
-		print('x')
-		print(x)
-		print(x.size())
-		y = self._kernel(x)
-		y = self._w(y)
-		return y
+# 	def forward(self, x):
+# 		# h = x.matmul(self.w.t()) + self.b
+# 		print('x')
+# 		print(x)
+# 		print(x.size())
+# 		y = self._kernel(x)
+# 		y = self._w(y)
+# 		return y
 
-def hinge_loss(y_pred, y_true):
-	# return torch.mean(torch.clamp(1 - y_pred.t() * y_true, min=0))
-	return torch.max(torch.zeros_like(y), 1-y_pred.t()*y_true).mean()
+# def hinge_loss(y_pred, y_true):
+# 	# return torch.mean(torch.clamp(1 - y_pred.t() * y_true, min=0))
+# 	return torch.max(torch.zeros_like(y), 1-y_pred.t()*y_true).mean()
 
 # def mypause(interval):
 # 	backend = plt.rcParams['backend']

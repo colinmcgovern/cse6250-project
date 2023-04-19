@@ -28,34 +28,49 @@ import sys
 from sklearn import svm
 
 from models import *
+from sklearn.ensemble import RandomForestClassifier
 
-DATA_SIZE = 5
-NUM_EPOCHS = 3
-MODEL_CHOICE = "SVM-RBF"
+DATA_SIZE = 20
+NUM_EPOCHS = 10
+MODEL_CHOICE = "RF"
+LABEL_CHOICE = "3+1"
 
 if(len(sys.argv)!=1):
 	DATA_SIZE = int(sys.argv[1])
 	NUM_EPOCHS = int(sys.argv[2])
 	MODEL_CHOICE = sys.argv[3]
 
+if(len(sys.argv)!=5):
+	print("WARNING")
+	print("Correct input is: script.py DATA_SIZE NUM_EPOCHS [SVM-RBF|SVM-L|RF|FFNN|CNN] [5|4|3+1]")
+	print("Using default input parameters...")
 
-# if(len(sys.argv)!=4):
-# 	print("input is: script.py DATA_SIZE NUM_EPOCHS [SVM-RBF|SVM-L|RF|FFNN|CNN]")
-# 	exit()
-
-PATH_OUTPUT = "."
+PATH_OUTPUT = "output"
 BATCH_SIZE = 4
 if(MODEL_CHOICE=="FFNN"):
 	BATCH_SIZE = 1
 USE_CUDA = True
 NUM_WORKERS = 0
-save_file = '{}_{}.pth'.format(MODEL_CHOICE,NUM_EPOCHS)
+save_file = os.path.join(PATH_OUTPUT,'{}_{}.pth'.format(MODEL_CHOICE,NUM_EPOCHS))
 
-# file_location = "/FileStore/tables/500_Reddit_users_posts_labels.csv" #DATABRICKS
 file_location = "500_Reddit_users_posts_labels.csv" #LOCAL
-string_to_num = {"Supportive": 0 , "Indicator": 1, "Ideation": 2,
- 					"Behavior": 3, "Attempt": 4}
 
+# Numbers to labels
+string_to_num = {}
+if(LABEL_CHOICE=="5"):
+	string_to_num = {"Supportive": 0 , "Indicator": 1, "Ideation": 2,
+	 					"Behavior": 3, "Attempt": 4}
+elif(LABEL_CHOICE=="4"):
+	string_to_num = {"Supportive": -1 , "Indicator": 0, "Ideation": 1,
+	 					"Behavior": 2, "Attempt": 3}
+elif(LABEL_CHOICE=="3+1"):
+	string_to_num = {"Supportive": 0 , "Indicator": 0, "Ideation": 1,
+	 					"Behavior": 2, "Attempt": 3}
+else:
+	exit()
+
+
+# Words to vector
 d = pd.read_hdf('mini.h5')
 words = list(d.index)
 key_to_index = {}
@@ -77,6 +92,7 @@ for i in range(0,len(df)):
 DATA_SIZE = int(DATA_SIZE)
 if(DATA_SIZE>0):
 	df = df.sample(frac=1)[0:DATA_SIZE]
+	print(df)
 
 #for testing
 # label_counts = Counter(df.iloc[:,2].values)
@@ -124,6 +140,7 @@ class MyDataset():
 		self.x_train=torch.stack((x2))
 		self.y=cut_df.iloc[:,2].values
 		self.y=[string_to_num[i] for i in self.y]
+		self.y=list(filter(lambda temp:temp>=0,self.y))
 		self.y_train=torch.tensor(self.y,dtype=torch.float64)
 	def __len__(self):
 		return len(self.y_train)
@@ -133,6 +150,12 @@ class MyDataset():
 		return self.x_train.detach().cpu().numpy()
 	def get_y(self):
 		return self.y
+
+#del
+temp = MyDataset()
+print(temp.get_x())
+print(temp.get_y())
+exit()
 
 def compute_batch_accuracy(output, target):
 	"""Computes the accuracy for a batch"""
@@ -257,7 +280,7 @@ def plot_learning_curves(train_losses, test_losses, train_accuracies, test_accur
 	plt.ylabel('Loss')
 	plt.xlabel('epoch')
 	plt.legend(loc="best")
-	plt.savefig("losses.png",pad_inches=0)
+	plt.savefig(os.path.join(PATH_OUTPUT,"{}_{}_losses.png".format(MODEL_CHOICE,NUM_EPOCHS)),pad_inches=0)
 	plt.clf() 
 	plt.cla() 
 	plt.figure()
@@ -266,7 +289,7 @@ def plot_learning_curves(train_losses, test_losses, train_accuracies, test_accur
 	plt.ylabel('Loss')
 	plt.xlabel('epoch')
 	plt.legend(loc="best")
-	plt.savefig("accuracies_{}.png".format(MODEL_CHOICE),pad_inches=0)
+	plt.savefig(os.path.join(PATH_OUTPUT,"{}_{}_accuracies.png".format(MODEL_CHOICE,NUM_EPOCHS)),pad_inches=0)
 	pass
 
 def plot_confusion_matrix(results, class_names):
@@ -283,8 +306,55 @@ def plot_confusion_matrix(results, class_names):
 	confusion_matrix = metrics.confusion_matrix(list(out[0]),list(out[1]),normalize='true')
 	cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix = confusion_matrix, display_labels = class_names)
 	cm_display.plot()
-	plt.savefig("confusion_{}.png".format(MODEL_CHOICE),pad_inches=0, dpi=199)
+	plt.savefig(os.path.join(PATH_OUTPUT,"{}_{}_confusion.png".format(MODEL_CHOICE,NUM_EPOCHS)),pad_inches=0, dpi=199)
 	pass
+
+class MyCNN(nn.Module):
+	def __init__(self, num_classes=5, window_sizes=(3,4,5)):
+		super(MyCNN, self).__init__()
+
+		self.convs = nn.ModuleList([
+			nn.Conv2d(1, 100, [window_size, 300], padding=(window_size - 1, 0))
+			for window_size in window_sizes
+		])
+
+		self.drop = Dropout(0.3)
+	
+		self.fc = nn.Linear(100 * len(window_sizes), num_classes)
+
+	def forward(self, x):
+
+		x = torch.unsqueeze(x, 1)
+		xs = []
+		for conv in self.convs:
+			x2 = torch.relu(conv(x))
+			x2 = torch.squeeze(x2, -1)
+			x2 = F.max_pool1d(x2, x2.size(2))
+			xs.append(x2)
+		x = torch.cat(xs, 2)
+
+		x = self.drop(x)
+		x = x.view(x.size(0), -1)
+		x = self.fc(x)
+
+		return x
+
+class MyFFNN(nn.Module):
+	def __init__(self, num_classes=5, buffer_size=-1):
+		super(MyFFNN, self).__init__()
+		self.layers = nn.Sequential(
+            nn.Linear(300*buffer_size, 256),
+            nn.ReLU(),
+            nn.Linear(256, 64),
+            nn.ReLU(),
+            nn.Linear(64, num_classes),
+            nn.Sigmoid()
+        )
+		
+	def forward(self, x):
+		x = x.view(x.size(0), -1) 
+		x = self.layers(x)
+		return x
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(1)
@@ -383,26 +453,30 @@ def fold_testing(fold=5):
 			print(test_results)
 
 		elif(MODEL_CHOICE[0:3]=='SVM'):
-			print("train_ds.get_x()")
-			print(train_ds.get_x())
-			print("train_ds.get_y()")
-			print(train_ds.get_y())
 			X = train_ds.get_x()
 			X = X.reshape(len(X),longest_post_len*300)
-			print("X")
-			print(X)
-			print(X.shape)
 			y = train_ds.get_y()
-			clf = svm.SVC(decision_function_shape='ovo')
+			if(MODEL_CHOICE=="SVM-L"):
+				clf = svm.SVC(decision_function_shape='ovo',kernel='linear')
+			elif(MODEL_CHOICE=="SVM-RBF"):
+				clf = svm.SVC(decision_function_shape='ovo',kernel='rbf')
+			else:
+				exit()
 			clf.fit(X, y)
 			predictions = clf.predict(test_ds.get_x().reshape(len(test_ds.get_x()),longest_post_len*300))
-			print("test_ds.get_y()")
-			print(test_ds.get_y())
-			print("predictions")
-			print(predictions)
 			test_results = list(zip(test_ds.get_y(),predictions))
-			print("test_results")
-			print(test_results)
+
+		elif(MODEL_CHOICE=='RF'):
+			X = train_ds.get_x()
+			X = X.reshape(len(X),longest_post_len*300)
+			y = train_ds.get_y()
+			rf_model = RandomForestClassifier()
+			rf_model.fit(X, y)
+			predictions = rf_model.predict(test_ds.get_x().reshape(len(test_ds.get_x()),longest_post_len*300))
+			test_results = list(zip(test_ds.get_y(),predictions))
+		else:
+			exit()
+
 
 		plot_confusion_matrix(test_results, string_to_num.keys())
 
@@ -427,7 +501,7 @@ def fold_testing(fold=5):
 
 	print("{} {} {} {}".format(precision_avg,recall_avg,f_score_avg,ord_error_avg))
 
-	with open("stats_{}.txt".format(MODEL_CHOICE), "w") as text_file:
+	with open(os.path.join(PATH_OUTPUT,"{}_{}_stats.txt".format(MODEL_CHOICE,NUM_EPOCHS)), "w") as text_file:
 		text_file.write("fold precision recall f_score ord_error\n")
 		text_file.write("{} {} {} {}".format(precision_avg,recall_avg,f_score_avg,ord_error_avg))
 
