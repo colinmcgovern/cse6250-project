@@ -25,12 +25,13 @@ from sklearn import metrics
 import random
 from collections import Counter
 import sys
+from sklearn import svm
 
 from models import *
 
-DATA_SIZE = 10
+DATA_SIZE = 5
 NUM_EPOCHS = 3
-MODEL_CHOICE = "FFNN"
+MODEL_CHOICE = "SVM-RBF"
 
 if(len(sys.argv)!=1):
 	DATA_SIZE = int(sys.argv[1])
@@ -44,6 +45,8 @@ if(len(sys.argv)!=1):
 
 PATH_OUTPUT = "."
 BATCH_SIZE = 4
+if(MODEL_CHOICE=="FFNN"):
+	BATCH_SIZE = 1
 USE_CUDA = True
 NUM_WORKERS = 0
 save_file = '{}_{}.pth'.format(MODEL_CHOICE,NUM_EPOCHS)
@@ -122,14 +125,13 @@ class MyDataset():
 		self.y=cut_df.iloc[:,2].values
 		self.y=[string_to_num[i] for i in self.y]
 		self.y_train=torch.tensor(self.y,dtype=torch.float64)
-		print("self.y_train: {}".format(self.y_train.size()))
 	def __len__(self):
 		return len(self.y_train)
 	def __getitem__(self,idx):
 		return self.x_train[idx],self.y_train[idx]
-	def x(self):
-		return self.x_train
-	def y(self):
+	def get_x(self):
+		return self.x_train.detach().cpu().numpy()
+	def get_y(self):
 		return self.y
 
 def compute_batch_accuracy(output, target):
@@ -178,17 +180,25 @@ def train(model_param, device, data_loader, criterion, optimizer, epoch, print_f
 		print("target")
 		print(target)
 		print(target.size())
-		if(target.size()==torch.Size([1])):
-			target = torch.unsqueeze(target,1)
+		# if(target.size()==torch.Size([1])):
+		# 	target = torch.unsqueeze(target,1)
+		print("1")
 		loss = criterion(output, target.long())
 		assert not np.isnan(loss.item()), 'Model diverged with loss = NaN'
+		print("1")
 		loss.backward()
+		print("2")
 		optimizer.step()
+		print("3")
 		# measure elapsed time
 		batch_time.update(time.time() - end)
+		print("4")
 		end = time.time()
+		print("5")
 		losses.update(loss.item(), target.size(0))
+		print("6")
 		accuracy.update(compute_batch_accuracy(output, target).item(), target.size(0))
+		print("7")
 		if i % print_freq == 0:
 			print('Epoch: [{0}][{1}/{2}]\t'
 				  'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
@@ -220,8 +230,8 @@ def evaluate(model_param, device, data_loader, criterion, print_freq=10):
 			print("target")
 			print(target)
 			print(target.size())
-			if(target.size()==torch.Size([1])):
-				target = torch.unsqueeze(target,1)
+			# if(target.size()==torch.Size([1])):
+			# 	target = torch.unsqueeze(target,1)
 			loss = criterion(output, target.long())
 			# measure elapsed time
 			batch_time.update(time.time() - end)
@@ -284,11 +294,11 @@ if device.type == "cuda":
 
 model_used = ""
 if(MODEL_CHOICE=="SVM-RBF"):
-	model_used = MySVM(MyDataset().x(),kernel='rbf')
+	model_used = ""
 elif(MODEL_CHOICE=="SVM-L"):
-	model_used = MySVM(MyDataset().x(),kernel='linear')
+	model_used = ""
 elif(MODEL_CHOICE=="RF"):
-	model_used = MyRF()
+	model_used = ""
 elif(MODEL_CHOICE=="FFNN"):
 	model_used = MyFFNN(5,longest_post_len)
 elif(MODEL_CHOICE=="CNN"):
@@ -297,11 +307,11 @@ else:
 	print("BAD MODEL NAME")
 	exit()
 
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model_used.parameters(),lr=0.001)
-
-model_used.to(device)
-criterion.to(device)
+if(MODEL_CHOICE=='CNN' or MODEL_CHOICE=='FFNN'):
+	criterion = nn.CrossEntropyLoss()
+	optimizer = optim.Adam(model_used.parameters(),lr=0.001)
+	model_used.to(device)
+	criterion.to(device)
 
 def fold_testing(fold=5):
 
@@ -334,40 +344,65 @@ def fold_testing(fold=5):
 		test_ds = MyDataset(start,test_len)
 		start = start + test_len
 
-		print("len(train_ds.y) {}".format(len(train_ds.y)))
-		print("len(test_ds.y) {}".format(len(test_ds.y)))
-		print("sum(test_ds.y) {}".format(sum(test_ds.y)))
+		print("len(train_ds.get_y) {}".format(len(train_ds.get_y())))
+		print("len(test_ds.get_y) {}".format(len(test_ds.get_y())))
+		print("sum(test_ds.get_y) {}".format(sum(test_ds.get_y())))
 
-		train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-		test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+		if(MODEL_CHOICE=='CNN' or MODEL_CHOICE=='FFNN'):
+			train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+			test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 
-		print("train_loader")
+			print("train_loader")
 
-		for epoch in range(NUM_EPOCHS):
-			print("epoch: {}".format(epoch))
+			for epoch in range(NUM_EPOCHS):
+				print("epoch: {}".format(epoch))
 
-			train_loss, train_accuracy = train(model_used, device, train_loader, criterion, optimizer, epoch)
-			test_loss, test_accuracy, test_results = evaluate(model_used, device, test_loader, criterion)
+				train_loss, train_accuracy = train(model_used, device, train_loader, criterion, optimizer, epoch)
+				test_loss, test_accuracy, test_results = evaluate(model_used, device, test_loader, criterion)
 
-			train_losses.append(train_loss)
-			test_losses.append(test_loss)
+				train_losses.append(train_loss)
+				test_losses.append(test_loss)
 
-			train_accuracies.append(train_accuracy)
-			test_accuracies.append(test_accuracy)
+				train_accuracies.append(train_accuracy)
+				test_accuracies.append(test_accuracy)
 
-			print("test_accuracy")
-			print(test_accuracy)
-			print("best_val_acc")
-			print(best_val_acc)
-			is_best = test_accuracy >= best_val_acc
-			if is_best:
-				best_val_acc = test_accuracy
-				torch.save(model_used, os.path.join(PATH_OUTPUT, save_file), _use_new_zipfile_serialization=False)
+				print("test_accuracy")
+				print(test_accuracy)
+				print("best_val_acc")
+				print(best_val_acc)
+				is_best = test_accuracy >= best_val_acc
+				if is_best:
+					best_val_acc = test_accuracy
+					torch.save(model_used, os.path.join(PATH_OUTPUT, save_file), _use_new_zipfile_serialization=False)
 
-		plot_learning_curves(train_losses, test_losses, train_accuracies, test_accuracies)
+			plot_learning_curves(train_losses, test_losses, train_accuracies, test_accuracies)
+			best_model_used = torch.load(os.path.join(PATH_OUTPUT, save_file))
+			test_loss, test_accuracy, test_results = evaluate(best_model_used, device, test_loader, criterion)
 
-		best_model_used = torch.load(os.path.join(PATH_OUTPUT, save_file))
-		test_loss, test_accuracy, test_results = evaluate(best_model_used, device, test_loader, criterion)
+			print("test_results")
+			print(test_results)
+
+		elif(MODEL_CHOICE[0:3]=='SVM'):
+			print("train_ds.get_x()")
+			print(train_ds.get_x())
+			print("train_ds.get_y()")
+			print(train_ds.get_y())
+			X = train_ds.get_x()
+			X = X.reshape(len(X),longest_post_len*300)
+			print("X")
+			print(X)
+			print(X.shape)
+			y = train_ds.get_y()
+			clf = svm.SVC(decision_function_shape='ovo')
+			clf.fit(X, y)
+			predictions = clf.predict(test_ds.get_x().reshape(len(test_ds.get_x()),longest_post_len*300))
+			print("test_ds.get_y()")
+			print(test_ds.get_y())
+			print("predictions")
+			print(predictions)
+			test_results = list(zip(test_ds.get_y(),predictions))
+			print("test_results")
+			print(test_results)
 
 		plot_confusion_matrix(test_results, string_to_num.keys())
 

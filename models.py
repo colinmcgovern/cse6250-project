@@ -35,7 +35,7 @@ from torchbearer.callbacks import L2WeightDecay, ExponentialLR
 class MySVM(nn.Module):
 	"""Support Vector Machine"""
 
-	def __init__(self, train_data_x, kernel='rbf',
+	def __init__(self, train_data_x, kernel, num_classes=5,
 				gamma_init=1.0, train_gamma=True):
 		super(MySVM,self).__init__()
 
@@ -43,17 +43,17 @@ class MySVM(nn.Module):
 
 		if kernel == 'linear':
 			self._kernel = self.linear
-			self._num_c = 300
+			self._num_c = train_data_x.size(1) * 300
 		elif kernel == 'rbf':
 			self._kernel = self.rbf
-			self._num_c = 300
+			self._num_c = train_data_x.size(0)
 			self._gamma = torch.nn.Parameter(torch.FloatTensor([gamma_init]),
 											 requires_grad=train_gamma)
 
-		self._w = torch.nn.Linear(in_features=self._num_c, out_features=1)
+		self._w = torch.nn.Linear(in_features=self._num_c, out_features=num_classes)
 
 	def rbf(self, x, gamma=1):
-		y = self._train_data_x.repeat(x.size(0), 1, 1)
+		y = self._train_data_x.repeat(self._train_data_x.size(0), 1, 1)
 		return torch.exp(-self._gamma*((x[:,None]-y)**2).sum(dim=2))
 
 	@staticmethod
@@ -62,6 +62,9 @@ class MySVM(nn.Module):
 
 	def forward(self, x):
 		# h = x.matmul(self.w.t()) + self.b
+		print('x')
+		print(x)
+		print(x.size())
 		y = self._kernel(x)
 		y = self._w(y)
 		return y
