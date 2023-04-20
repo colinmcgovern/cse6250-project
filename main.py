@@ -30,8 +30,8 @@ from sklearn import svm
 from models import *
 from sklearn.ensemble import RandomForestClassifier
 
-DATA_SIZE = 20
-NUM_EPOCHS = 10
+DATA_SIZE = 100
+NUM_EPOCHS = 1
 MODEL_CHOICE = "RF"
 LABEL_CHOICE = "3+1"
 
@@ -39,6 +39,7 @@ if(len(sys.argv)!=1):
 	DATA_SIZE = int(sys.argv[1])
 	NUM_EPOCHS = int(sys.argv[2])
 	MODEL_CHOICE = sys.argv[3]
+	LABEL_CHOICE = sys.argv[4]
 
 if(len(sys.argv)!=5):
 	print("WARNING")
@@ -51,21 +52,25 @@ if(MODEL_CHOICE=="FFNN"):
 	BATCH_SIZE = 1
 USE_CUDA = True
 NUM_WORKERS = 0
-save_file = os.path.join(PATH_OUTPUT,'{}_{}.pth'.format(MODEL_CHOICE,NUM_EPOCHS))
+save_file = '{}_{}_{}_{}.pth'.format(MODEL_CHOICE,LABEL_CHOICE,NUM_EPOCHS,DATA_SIZE)
 
 file_location = "500_Reddit_users_posts_labels.csv" #LOCAL
 
 # Numbers to labels
 string_to_num = {}
+num_to_string = {}
 if(LABEL_CHOICE=="5"):
 	string_to_num = {"Supportive": 0 , "Indicator": 1, "Ideation": 2,
 	 					"Behavior": 3, "Attempt": 4}
+	num_to_string = {0: "Supportive",1:"Indicator",2:"Ideation",3:"Behavior",4:"Attempt"}
 elif(LABEL_CHOICE=="4"):
 	string_to_num = {"Supportive": -1 , "Indicator": 0, "Ideation": 1,
 	 					"Behavior": 2, "Attempt": 3}
+	num_to_string = {0:"Indicator",1:"Ideation",2:"Behavior",3:"Attempt"}
 elif(LABEL_CHOICE=="3+1"):
 	string_to_num = {"Supportive": 0 , "Indicator": 0, "Ideation": 1,
 	 					"Behavior": 2, "Attempt": 3}
+	num_to_string = {0:"Control",1:"Ideation",2:"Behavior",3:"Attempt"}
 else:
 	exit()
 
@@ -131,7 +136,6 @@ class MyDataset():
 			cut_df = df[0:start].append(df[start+length:len(df)])
 		else:
 			cut_df = df[start:start+length]
-		print("cut_df size is {}".format(len(cut_df)))
 		x=cut_df.iloc[:,1].map(convert_posts)
 		x2 = []
 		for i in x:
@@ -150,12 +154,6 @@ class MyDataset():
 		return self.x_train.detach().cpu().numpy()
 	def get_y(self):
 		return self.y
-
-#del
-temp = MyDataset()
-print(temp.get_x())
-print(temp.get_y())
-exit()
 
 def compute_batch_accuracy(output, target):
 	"""Computes the accuracy for a batch"""
@@ -197,31 +195,17 @@ def train(model_param, device, data_loader, criterion, optimizer, epoch, print_f
 		target = target.to(device)
 		optimizer.zero_grad()
 		output = model_param(input.float())
-		print("output")
-		print(output)
-		print(output.size())
-		print("target")
-		print(target)
-		print(target.size())
 		# if(target.size()==torch.Size([1])):
 		# 	target = torch.unsqueeze(target,1)
-		print("1")
 		loss = criterion(output, target.long())
 		assert not np.isnan(loss.item()), 'Model diverged with loss = NaN'
-		print("1")
 		loss.backward()
-		print("2")
 		optimizer.step()
-		print("3")
 		# measure elapsed time
 		batch_time.update(time.time() - end)
-		print("4")
 		end = time.time()
-		print("5")
 		losses.update(loss.item(), target.size(0))
-		print("6")
 		accuracy.update(compute_batch_accuracy(output, target).item(), target.size(0))
-		print("7")
 		if i % print_freq == 0:
 			print('Epoch: [{0}][{1}/{2}]\t'
 				  'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
@@ -248,10 +232,8 @@ def evaluate(model_param, device, data_loader, criterion, print_freq=10):
 			target = target.to(device)
 			output = model_param(input.float())
 			print("output")
-			print(output)
 			print(output.size())
 			print("target")
-			print(target)
 			print(target.size())
 			# if(target.size()==torch.Size([1])):
 			# 	target = torch.unsqueeze(target,1)
@@ -280,7 +262,7 @@ def plot_learning_curves(train_losses, test_losses, train_accuracies, test_accur
 	plt.ylabel('Loss')
 	plt.xlabel('epoch')
 	plt.legend(loc="best")
-	plt.savefig(os.path.join(PATH_OUTPUT,"{}_{}_losses.png".format(MODEL_CHOICE,NUM_EPOCHS)),pad_inches=0)
+	plt.savefig(os.path.join(PATH_OUTPUT,"{}_{}_{}_{}_losses.png".format(MODEL_CHOICE,LABEL_CHOICE,NUM_EPOCHS,DATA_SIZE)),pad_inches=0)
 	plt.clf() 
 	plt.cla() 
 	plt.figure()
@@ -289,10 +271,10 @@ def plot_learning_curves(train_losses, test_losses, train_accuracies, test_accur
 	plt.ylabel('Loss')
 	plt.xlabel('epoch')
 	plt.legend(loc="best")
-	plt.savefig(os.path.join(PATH_OUTPUT,"{}_{}_accuracies.png".format(MODEL_CHOICE,NUM_EPOCHS)),pad_inches=0)
+	plt.savefig(os.path.join(PATH_OUTPUT,"{}_{}_{}_{}_accuracies.png".format(MODEL_CHOICE,LABEL_CHOICE,NUM_EPOCHS,DATA_SIZE)),pad_inches=0)
 	pass
 
-def plot_confusion_matrix(results, class_names):
+def plot_confusion_matrix(results):
 	plt.clf() 
 	plt.cla() 
 	plt.rc('font', size=8)		  # controls default text sizes
@@ -303,14 +285,28 @@ def plot_confusion_matrix(results, class_names):
 	plt.rc('legend', fontsize=8)	# legend fontsize
 	plt.rc('figure', titlesize=8)  # fontsize of the figure title
 	out = list(zip(*results))
+
+	class_names = list(num_to_string.values())
+	# print("class_names")
+	# print(class_names)
+	# print("list(out[0])")
+	# print(list(out[0]))
+	# print("list(out[1]")
+	# print(list(out[1]))
+
 	confusion_matrix = metrics.confusion_matrix(list(out[0]),list(out[1]),normalize='true')
 	cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix = confusion_matrix, display_labels = class_names)
 	cm_display.plot()
-	plt.savefig(os.path.join(PATH_OUTPUT,"{}_{}_confusion.png".format(MODEL_CHOICE,NUM_EPOCHS)),pad_inches=0, dpi=199)
+	plt.savefig(os.path.join(PATH_OUTPUT,"{}_{}_{}_{}_confusion_NORMALIZED.png".format(MODEL_CHOICE,LABEL_CHOICE,NUM_EPOCHS,DATA_SIZE)),pad_inches=0, dpi=199)
+
+	confusion_matrix = metrics.confusion_matrix(list(out[0]),list(out[1]),normalize=None)
+	cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix = confusion_matrix, display_labels = class_names)
+	cm_display.plot()
+	plt.savefig(os.path.join(PATH_OUTPUT,"{}_{}_{}_{}_confusion.png".format(MODEL_CHOICE,LABEL_CHOICE,NUM_EPOCHS,DATA_SIZE)),pad_inches=0, dpi=199)
 	pass
 
 class MyCNN(nn.Module):
-	def __init__(self, num_classes=5, window_sizes=(3,4,5)):
+	def __init__(self, num_classes, window_sizes=(3,4,5)):
 		super(MyCNN, self).__init__()
 
 		self.convs = nn.ModuleList([
@@ -340,16 +336,14 @@ class MyCNN(nn.Module):
 		return x
 
 class MyFFNN(nn.Module):
-	def __init__(self, num_classes=5, buffer_size=-1):
+	def __init__(self, num_classes, buffer_size=-1):
 		super(MyFFNN, self).__init__()
 		self.layers = nn.Sequential(
-            nn.Linear(300*buffer_size, 256),
-            nn.ReLU(),
-            nn.Linear(256, 64),
-            nn.ReLU(),
-            nn.Linear(64, num_classes),
-            nn.Sigmoid()
-        )
+			nn.Linear(300*buffer_size, 64),
+			nn.ReLU(),
+			nn.Linear(64, num_classes),
+			nn.Sigmoid()
+		)
 		
 	def forward(self, x):
 		x = x.view(x.size(0), -1) 
@@ -359,6 +353,7 @@ class MyFFNN(nn.Module):
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(1)
 if device.type == "cuda":
+	print("C-C-CUDA ACTIVE!!!")
 	torch.backends.cudnn.deterministic = True
 	torch.backends.cudnn.benchmark = False
 
@@ -370,9 +365,15 @@ elif(MODEL_CHOICE=="SVM-L"):
 elif(MODEL_CHOICE=="RF"):
 	model_used = ""
 elif(MODEL_CHOICE=="FFNN"):
-	model_used = MyFFNN(5,longest_post_len)
+	if(LABEL_CHOICE=="5"):
+		model_used = MyFFNN(5,longest_post_len)
+	else:
+		model_used = MyFFNN(4,longest_post_len)
 elif(MODEL_CHOICE=="CNN"):
-	model_used = MyCNN()
+	if(LABEL_CHOICE=="5"):
+		model_used = MyCNN(5)
+	else:
+		model_used = MyCNN(4,longest_post_len)
 else:
 	print("BAD MODEL NAME")
 	exit()
@@ -414,10 +415,6 @@ def fold_testing(fold=5):
 		test_ds = MyDataset(start,test_len)
 		start = start + test_len
 
-		print("len(train_ds.get_y) {}".format(len(train_ds.get_y())))
-		print("len(test_ds.get_y) {}".format(len(test_ds.get_y())))
-		print("sum(test_ds.get_y) {}".format(sum(test_ds.get_y())))
-
 		if(MODEL_CHOICE=='CNN' or MODEL_CHOICE=='FFNN'):
 			train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 			test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
@@ -436,10 +433,6 @@ def fold_testing(fold=5):
 				train_accuracies.append(train_accuracy)
 				test_accuracies.append(test_accuracy)
 
-				print("test_accuracy")
-				print(test_accuracy)
-				print("best_val_acc")
-				print(best_val_acc)
 				is_best = test_accuracy >= best_val_acc
 				if is_best:
 					best_val_acc = test_accuracy
@@ -448,9 +441,6 @@ def fold_testing(fold=5):
 			plot_learning_curves(train_losses, test_losses, train_accuracies, test_accuracies)
 			best_model_used = torch.load(os.path.join(PATH_OUTPUT, save_file))
 			test_loss, test_accuracy, test_results = evaluate(best_model_used, device, test_loader, criterion)
-
-			print("test_results")
-			print(test_results)
 
 		elif(MODEL_CHOICE[0:3]=='SVM'):
 			X = train_ds.get_x()
@@ -478,7 +468,7 @@ def fold_testing(fold=5):
 			exit()
 
 
-		plot_confusion_matrix(test_results, string_to_num.keys())
+		plot_confusion_matrix(test_results)
 
 		true_output = [i for (i, j) in test_results]
 		pred_output = [j for (i, j) in test_results]
@@ -494,6 +484,14 @@ def fold_testing(fold=5):
 		print("f_score: {}".format(f_score(true_output,pred_output)))
 		print("ord_error: {}".format(ord_error(true_output,pred_output)))
 
+		actual_pred_df = pd.DataFrame({'true_output': true_output,'pred_output': pred_output})
+		actual_pred_df.to_csv(os.path.join(
+			PATH_OUTPUT,"{}_{}_{}_{}_{}_actual_pred_df.txt".format(MODEL_CHOICE,LABEL_CHOICE,NUM_EPOCHS,DATA_SIZE,fold)), sep='\t')
+
+		with open(os.path.join(PATH_OUTPUT,"{}_{}_{}_{}_{}_counts.txt".format(MODEL_CHOICE,LABEL_CHOICE,NUM_EPOCHS,DATA_SIZE,fold)), 'w') as file:
+	 		file.write(str(dict(Counter(true_output))))
+	 		file.write(str(dict(Counter(pred_output))))
+
 	precision_avg = precision_avg / fold
 	recall_avg = recall_avg / fold
 	f_score_avg = f_score_avg / fold
@@ -501,8 +499,8 @@ def fold_testing(fold=5):
 
 	print("{} {} {} {}".format(precision_avg,recall_avg,f_score_avg,ord_error_avg))
 
-	with open(os.path.join(PATH_OUTPUT,"{}_{}_stats.txt".format(MODEL_CHOICE,NUM_EPOCHS)), "w") as text_file:
-		text_file.write("fold precision recall f_score ord_error\n")
+	with open(os.path.join(PATH_OUTPUT,"{}_{}_{}_{}_stats.txt".format(MODEL_CHOICE,LABEL_CHOICE,NUM_EPOCHS,DATA_SIZE)), "w") as text_file:
+		text_file.write("precision recall f_score ord_error\n")
 		text_file.write("{} {} {} {}".format(precision_avg,recall_avg,f_score_avg,ord_error_avg))
 
 
