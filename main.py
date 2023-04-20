@@ -30,9 +30,9 @@ from sklearn import svm
 from models import *
 from sklearn.ensemble import RandomForestClassifier
 
-DATA_SIZE = 100
+DATA_SIZE = 10
 NUM_EPOCHS = 1
-MODEL_CHOICE = "RF"
+MODEL_CHOICE = "CNN"
 LABEL_CHOICE = "3+1"
 
 if(len(sys.argv)!=1):
@@ -243,6 +243,12 @@ def evaluate(model_param, device, data_loader, criterion, print_freq=10):
 			end = time.time()
 			losses.update(loss.item(), target.size(0))
 			accuracy.update(compute_batch_accuracy(output, target).item(), target.size(0))
+
+			print("target")
+			print(target)
+			print("output")
+			print(output)
+
 			y_true = target.detach().to('cpu').numpy().tolist()
 			y_pred = output.detach().to('cpu').max(1)[1].numpy().tolist()
 			results.extend(list(zip(y_true, y_pred)))
@@ -373,7 +379,7 @@ elif(MODEL_CHOICE=="CNN"):
 	if(LABEL_CHOICE=="5"):
 		model_used = MyCNN(5)
 	else:
-		model_used = MyCNN(4,longest_post_len)
+		model_used = MyCNN(4)
 else:
 	print("BAD MODEL NAME")
 	exit()
@@ -383,6 +389,7 @@ if(MODEL_CHOICE=='CNN' or MODEL_CHOICE=='FFNN'):
 	optimizer = optim.Adam(model_used.parameters(),lr=0.001)
 	model_used.to(device)
 	criterion.to(device)
+	untrained_model = model_used
 
 def fold_testing(fold=5):
 
@@ -406,16 +413,17 @@ def fold_testing(fold=5):
 	start = 0
 
 	for i in range(fold):
-		print("####### FOLD: {} #######".format(i))
+		print("####### FOLD: {} #######".format(i))		
 
 		test_len = int(len(df)/fold)
 		if(start+test_len > len(df)):
 			test_len = len(df)-start+test_len
 		train_ds = MyDataset(start,test_len,True)
-		test_ds = MyDataset(start,test_len)
+		test_ds = MyDataset(start,test_len,False)
 		start = start + test_len
 
 		if(MODEL_CHOICE=='CNN' or MODEL_CHOICE=='FFNN'):
+			model_used = untrained_model
 			train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 			test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 
