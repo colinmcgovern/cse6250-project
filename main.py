@@ -34,16 +34,21 @@ DATA_SIZE = 10
 NUM_EPOCHS = 1
 MODEL_CHOICE = "CNN"
 LABEL_CHOICE = "3+1"
+USE_CF = True
 
 if(len(sys.argv)!=1):
 	DATA_SIZE = int(sys.argv[1])
 	NUM_EPOCHS = int(sys.argv[2])
 	MODEL_CHOICE = sys.argv[3]
 	LABEL_CHOICE = sys.argv[4]
+	if(sys.argv[5]=="USE_CF"):
+		USE_CF = True
+	else:
+		USE_CF = False
 
 if(len(sys.argv)!=5):
 	print("WARNING")
-	print("Correct input is: script.py DATA_SIZE NUM_EPOCHS [SVM-RBF|SVM-L|RF|FFNN|CNN] [5|4|3+1]")
+	print("Correct input is: script.py DATA_SIZE NUM_EPOCHS [SVM-RBF|SVM-L|RF|FFNN|CNN] [5|4|3+1] [USE_CF|NO_CF]")
 	print("Using default input parameters...")
 
 PATH_OUTPUT = "output"
@@ -54,7 +59,8 @@ USE_CUDA = True
 NUM_WORKERS = 0
 save_file = '{}_{}_{}_{}.pth'.format(MODEL_CHOICE,LABEL_CHOICE,NUM_EPOCHS,DATA_SIZE)
 
-file_location = "500_Reddit_users_posts_labels.csv" #LOCAL
+# file_location = "500_Reddit_users_posts_labels.csv" #LOCAL
+file_location = "reddit_data_with_cf.csv" #LOCAL
 
 # Numbers to labels
 string_to_num = {}
@@ -272,7 +278,7 @@ def plot_learning_curves(train_losses, test_losses, train_accuracies, test_accur
 	plt.clf() 
 	plt.cla() 
 	plt.figure()
-	plt.plot(np.arange(len(train_accuracies)), train_accuracies, label='Train')
+	plt.plot(np.arange(len(train_accuraci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es)), train_accuracies, label='Train')
 	plt.plot(np.arange(len(test_accuracies)), test_accuracies, label='Validation')
 	plt.ylabel('Loss')
 	plt.xlabel('epoch')
@@ -447,7 +453,8 @@ def fold_testing(fold=5):
 					torch.save(model_used, os.path.join(PATH_OUTPUT, save_file), _use_new_zipfile_serialization=False)
 
 			plot_learning_curves(train_losses, test_losses, train_accuracies, test_accuracies)
-			best_model_used = torch.load(os.path.join(PATH_OUTPUT, save_file))
+			# best_model_used = torch.load(os.path.join(PATH_OUTPUT, save_file))
+			best_model_used = model_used
 			test_loss, test_accuracy, test_results = evaluate(best_model_used, device, test_loader, criterion)
 
 		elif(MODEL_CHOICE[0:3]=='SVM'):
