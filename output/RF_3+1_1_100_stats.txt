@@ -1,2 +1,0 @@
-precision recall f_score ord_error
-0.82 0.7005841132439599 0.7502940411686619 0.54

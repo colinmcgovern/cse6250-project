@@ -27,6 +27,7 @@ from collections import Counter
 import sys
 from sklearn import svm
 
+from models import *
 from sklearn.ensemble import RandomForestClassifier
 
 DATA_SIZE = 10
@@ -50,20 +51,13 @@ if(len(sys.argv)!=5):
 	print("Correct input is: script.py DATA_SIZE NUM_EPOCHS [SVM-RBF|SVM-L|RF|FFNN|CNN] [5|4|3+1] [USE_CF|NO_CF]")
 	print("Using default input parameters...")
 
-fold = -1
-
-RUN_FOLDER = "DATA_SIZE_{}_NUM_EPOCHS_{}_MODEL_CHOICE_{}_LABEL_CHOICE_{}_USE_CF_{}_fold/".format(DATA_SIZE,NUM_EPOCHS,MODEL_CHOICE,LABEL_CHOICE,USE_CF,fold)
-PATH_OUTPUT = "output/" + RUN_FOLDER
-
-if not os.path.exists(PATH_OUTPUT):
-    os.makedirs(PATH_OUTPUT)
-
+PATH_OUTPUT = "output"
 BATCH_SIZE = 4
 if(MODEL_CHOICE=="FFNN"):
 	BATCH_SIZE = 1
 USE_CUDA = True
 NUM_WORKERS = 0
-save_file = 'model_trained.pth'.format(MODEL_CHOICE,LABEL_CHOICE,NUM_EPOCHS,DATA_SIZE)
+save_file = '{}_{}_{}_{}.pth'.format(MODEL_CHOICE,LABEL_CHOICE,NUM_EPOCHS,DATA_SIZE)
 
 # file_location = "500_Reddit_users_posts_labels.csv" #LOCAL
 file_location = "reddit_data_with_cf.csv" #LOCAL
@@ -140,7 +134,7 @@ def convert_posts(posts):
 	return np.array(new_posts)
 
 class MyDataset():
-	def __init__(self,start,length,remove_mode,include_cf):
+	def __init__(self,start=0,length=-1,remove_mode=False):
 		cut_df = df
 		if(length==-1):
 			length = len(df)
@@ -149,12 +143,6 @@ class MyDataset():
 		else:
 			cut_df = df[start:start+length]
 		x=cut_df.iloc[:,1].map(convert_posts)
-		if(include_cf==1):
-			for i in range(len(cut_df)):
-				cf_vals = list(cut_df.iloc[i].iloc[3:len(cut_df.columns)])
-				cf_vals = (cf_vals + 300 * [0])[:300]
-				x.iloc[i][len(x)] = cf_vals
-				x.iloc[i] = np.vstack([x.iloc[i],cf_vals])
 		x2 = []
 		for i in x:
 			x2.append(torch.from_numpy(i))
@@ -286,7 +274,7 @@ def plot_learning_curves(train_losses, test_losses, train_accuracies, test_accur
 	plt.ylabel('Loss')
 	plt.xlabel('epoch')
 	plt.legend(loc="best")
-	plt.savefig(os.path.join(PATH_OUTPUT,"losses.png"),pad_inches=0)
+	plt.savefig(os.path.join(PATH_OUTPUT,"{}_{}_{}_{}_losses.png".format(MODEL_CHOICE,LABEL_CHOICE,NUM_EPOCHS,DATA_SIZE)),pad_inches=0)
 	plt.clf() 
 	plt.cla() 
 	plt.figure()
@@ -295,7 +283,7 @@ def plot_learning_curves(train_losses, test_losses, train_accuracies, test_accur
 	plt.ylabel('Loss')
 	plt.xlabel('epoch')
 	plt.legend(loc="best")
-	plt.savefig(os.path.join(PATH_OUTPUT,"accuracies.png"),pad_inches=0)
+	plt.savefig(os.path.join(PATH_OUTPUT,"{}_{}_{}_{}_accuracies.png".format(MODEL_CHOICE,LABEL_CHOICE,NUM_EPOCHS,DATA_SIZE)),pad_inches=0)
 	pass
 
 def plot_confusion_matrix(results):
@@ -321,12 +309,12 @@ def plot_confusion_matrix(results):
 	confusion_matrix = metrics.confusion_matrix(list(out[0]),list(out[1]),normalize='true')
 	cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix = confusion_matrix, display_labels = class_names)
 	cm_display.plot()
-	plt.savefig(os.path.join(PATH_OUTPUT,"confusion_NORMALIZED.png"),pad_inches=0, dpi=199)
+	plt.savefig(os.path.join(PATH_OUTPUT,"{}_{}_{}_{}_confusion_NORMALIZED.png".format(MODEL_CHOICE,LABEL_CHOICE,NUM_EPOCHS,DATA_SIZE)),pad_inches=0, dpi=199)
 
 	confusion_matrix = metrics.confusion_matrix(list(out[0]),list(out[1]),normalize=None)
 	cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix = confusion_matrix, display_labels = class_names)
 	cm_display.plot()
-	plt.savefig(os.path.join(PATH_OUTPUT,"confusion.png"),pad_inches=0, dpi=199)
+	plt.savefig(os.path.join(PATH_OUTPUT,"{}_{}_{}_{}_confusion.png".format(MODEL_CHOICE,LABEL_CHOICE,NUM_EPOCHS,DATA_SIZE)),pad_inches=0, dpi=199)
 	pass
 
 class MyCNN(nn.Module):
@@ -436,8 +424,8 @@ def fold_testing(fold=5):
 		test_len = int(len(df)/fold)
 		if(start+test_len > len(df)):
 			test_len = len(df)-start+test_len
-		train_ds = MyDataset(start,test_len,True,USE_CF)
-		test_ds = MyDataset(start,test_len,False,USE_CF)
+		train_ds = MyDataset(start,test_len,True)
+		test_ds = MyDataset(start,test_len,False)
 		start = start + test_len
 
 		if(MODEL_CHOICE=='CNN' or MODEL_CHOICE=='FFNN'):
@@ -513,9 +501,9 @@ def fold_testing(fold=5):
 
 		actual_pred_df = pd.DataFrame({'true_output': true_output,'pred_output': pred_output})
 		actual_pred_df.to_csv(os.path.join(
-			PATH_OUTPUT,"actual_pred_df.txt"), sep='\t')
+			PATH_OUTPUT,"{}_{}_{}_{}_{}_actual_pred_df.txt".format(MODEL_CHOICE,LABEL_CHOICE,NUM_EPOCHS,DATA_SIZE,fold)), sep='\t')
 
-		with open(os.path.join(PATH_OUTPUT,"counts.txt"), 'w') as file:
+		with open(os.path.join(PATH_OUTPUT,"{}_{}_{}_{}_{}_counts.txt".format(MODEL_CHOICE,LABEL_CHOICE,NUM_EPOCHS,DATA_SIZE,fold)), 'w') as file:
 	 		file.write(str(dict(Counter(true_output))))
 	 		file.write(str(dict(Counter(pred_output))))
 
@@ -526,7 +514,7 @@ def fold_testing(fold=5):
 
 	print("{} {} {} {}".format(precision_avg,recall_avg,f_score_avg,ord_error_avg))
 
-	with open(os.path.join(PATH_OUTPUT,"stats.txt"), "w") as text_file:
+	with open(os.path.join(PATH_OUTPUT,"{}_{}_{}_{}_stats.txt".format(MODEL_CHOICE,LABEL_CHOICE,NUM_EPOCHS,DATA_SIZE)), "w") as text_file:
 		text_file.write("precision recall f_score ord_error\n")
 		text_file.write("{} {} {} {}".format(precision_avg,recall_avg,f_score_avg,ord_error_avg))
 
