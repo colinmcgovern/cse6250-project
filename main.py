@@ -55,6 +55,8 @@ fold = -1
 RUN_FOLDER = "DATA_SIZE_{}_NUM_EPOCHS_{}_MODEL_CHOICE_{}_LABEL_CHOICE_{}_USE_CF_{}_fold/".format(DATA_SIZE,NUM_EPOCHS,MODEL_CHOICE,LABEL_CHOICE,USE_CF,fold)
 PATH_OUTPUT = "output/" + RUN_FOLDER
 
+print("The output will be: {}".format(RUN_OUTPUT))
+
 if not os.path.exists(PATH_OUTPUT):
     os.makedirs(PATH_OUTPUT)
 
@@ -86,7 +88,6 @@ elif(LABEL_CHOICE=="3+1"):
 else:
 	exit()
 
-
 # Words to vector
 d = pd.read_hdf('mini.h5')
 words = list(d.index)
@@ -110,20 +111,6 @@ DATA_SIZE = int(DATA_SIZE)
 if(DATA_SIZE>0):
 	df = df.sample(frac=1)[0:DATA_SIZE]
 	print(df)
-
-#for testing
-# label_counts = Counter(df.iloc[:,2].values)
-# smallest_count = min(label_counts.values())
-# all_labels = label_counts.keys()
-# new_df = pd.DataFrame()
-# for label in all_labels:
-# 	to_add = df[df['Label']==label][0:smallest_count]
-# 	if(len(new_df)==0):
-# 		new_df = to_add
-# 	else:
-# 		new_df = new_df.append(to_add, ignore_index = True)
-# df = new_df.sample(frac=1)
-#for testing
 
 longest_post_len = 0
 for i in range(0,len(df)):
@@ -272,12 +259,6 @@ def evaluate(model_param, device, data_loader, criterion, print_freq=10):
 			end = time.time()
 			losses.update(loss.item(), target.size(0))
 			accuracy.update(compute_batch_accuracy(output, target).item(), target.size(0))
-
-			print("target")
-			print(target)
-			print("output")
-			print(output)
-
 			y_true = target.detach().to('cpu').numpy().tolist()
 			y_pred = output.detach().to('cpu').max(1)[1].numpy().tolist()
 			results.extend(list(zip(y_true, y_pred)))
@@ -323,20 +304,13 @@ def plot_confusion_matrix(results):
 	plt.rc('legend', fontsize=8)	# legend fontsize
 	plt.rc('figure', titlesize=8)  # fontsize of the figure title
 	out = list(zip(*results))
-
 	class_names = list(num_to_string.values())
-	# print("class_names")
-	# print(class_names)
-	# print("list(out[0])")
-	# print(list(out[0]))
-	# print("list(out[1]")
-	# print(list(out[1]))
-
+	# normalized
 	confusion_matrix = metrics.confusion_matrix(list(out[0]),list(out[1]),normalize='true')
 	cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix = confusion_matrix, display_labels = class_names)
 	cm_display.plot()
 	plt.savefig(os.path.join(PATH_OUTPUT,"confusion_NORMALIZED.png"),pad_inches=0, dpi=199)
-
+	# non normalized
 	confusion_matrix = metrics.confusion_matrix(list(out[0]),list(out[1]),normalize=None)
 	cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix = confusion_matrix, display_labels = class_names)
 	cm_display.plot()
@@ -347,18 +321,14 @@ def plot_confusion_matrix(results):
 class MyCNN(nn.Module):
 	def __init__(self, num_classes, window_sizes=(3,4,5)):
 		super(MyCNN, self).__init__()
-
 		self.convs = nn.ModuleList([
 			nn.Conv2d(1, 100, [window_size, 300], padding=(window_size - 1, 0))
 			for window_size in window_sizes
 		])
-
 		self.drop = Dropout(0.3)
-	
 		self.fc = nn.Linear(100 * len(window_sizes), num_classes)
 
 	def forward(self, x):
-
 		x = torch.unsqueeze(x, 1)
 		xs = []
 		for conv in self.convs:
@@ -367,11 +337,9 @@ class MyCNN(nn.Module):
 			x2 = F.max_pool1d(x2, x2.size(2))
 			xs.append(x2)
 		x = torch.cat(xs, 2)
-
 		x = self.drop(x)
 		x = x.view(x.size(0), -1)
 		x = self.fc(x)
-
 		return x
 
 class MyFFNN(nn.Module):
@@ -383,7 +351,6 @@ class MyFFNN(nn.Module):
 			nn.Linear(64, num_classes),
 			nn.Sigmoid()
 		)
-		
 	def forward(self, x):
 		x = x.view(x.size(0), -1) 
 		x = self.layers(x)
@@ -425,58 +392,44 @@ if(MODEL_CHOICE=='CNN' or MODEL_CHOICE=='FFNN'):
 	untrained_model = model_used
 
 def fold_testing(fold=5):
-
 	best_val_acc = 0.0
 	train_losses, train_accuracies = [], []
 	test_losses, test_accuracies = [], []
-
 	test_size = int(len(df)/fold)
 	train_size = len(df)-test_size
-
 	print('test_size')
 	print(test_size)
 	print('train_size')
 	print(train_size)
-
 	precision_avg = 0
 	recall_avg = 0
 	f_score_avg = 0
 	ord_error_avg = 0
-
 	start = 0
-
 	for i in range(fold):
 		print("####### FOLD: {} #######".format(i))		
-
 		test_len = int(len(df)/fold)
 		if(start+test_len > len(df)):
 			test_len = len(df)-start+test_len
-
 		print("Making train_ds")
 		train_ds = MyDataset(start,test_len,True,USE_CF)
 		print("Making test_ds")
 		test_ds = MyDataset(start,test_len,False,USE_CF)
 		start = start + test_len
-
 		if(MODEL_CHOICE=='CNN' or MODEL_CHOICE=='FFNN'):
 			model_used = untrained_model
 			print("train_ds to loader")
 			train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
 			print("test_ds to loader")
 			test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-
 			for epoch in range(NUM_EPOCHS):
 				print("epoch: {}".format(epoch))
-
 				train_loss, train_accuracy = train(model_used, device, train_loader, criterion, optimizer, epoch)
 				test_loss, test_accuracy, test_results = evaluate(model_used, device, test_loader, criterion)
-
 				train_losses.append(train_loss)
 				test_losses.append(test_loss)
-
 				train_accuracies.append(train_accuracy)
 				test_accuracies.append(test_accuracy)
-
 				is_best = test_accuracy >= best_val_acc
 				if is_best:
 					best_val_acc = test_accuracy
@@ -486,11 +439,9 @@ def fold_testing(fold=5):
 			# best_model_used = torch.load(os.path.join(PATH_OUTPUT, save_file))
 			best_model_used = model_used
 			test_loss, test_accuracy, test_results = evaluate(best_model_used, device, test_loader, criterion)
-
 			del train_ds
 			del test_ds
 			del model_used
-
 		elif(MODEL_CHOICE[0:3]=='SVM'):
 			X = train_ds.get_x()
 			X = X.reshape(len(X),(longest_post_len+USE_CF)*300)
@@ -504,7 +455,6 @@ def fold_testing(fold=5):
 			clf.fit(X, y)
 			predictions = clf.predict(test_ds.get_x().reshape(len(test_ds.get_x()),(longest_post_len+USE_CF)*300))
 			test_results = list(zip(test_ds.get_y(),predictions))
-
 		elif(MODEL_CHOICE=='RF'):
 			X = train_ds.get_x()
 			X = X.reshape(len(X),(longest_post_len+USE_CF)*300)
@@ -515,27 +465,20 @@ def fold_testing(fold=5):
 			test_results = list(zip(test_ds.get_y(),predictions))
 		else:
 			exit()
-
-
 		plot_confusion_matrix(test_results)
-
 		true_output = [i for (i, j) in test_results]
 		pred_output = [j for (i, j) in test_results]
-
 		precision_avg = precision_avg + precision(true_output,pred_output)
 		recall_avg = recall_avg + recall(true_output,pred_output)
 		f_score_avg = f_score_avg + f_score(true_output,pred_output)
 		ord_error_avg = ord_error_avg + ord_error(true_output,pred_output)
-
 		print("fold: {}".format(fold))
 		print("precision: {}".format(precision(true_output,pred_output)))
 		print("recall: {}".format(recall(true_output,pred_output)))
 		print("f_score: {}".format(f_score(true_output,pred_output)))
 		print("ord_error: {}".format(ord_error(true_output,pred_output)))
-
 		actual_pred_df = pd.DataFrame({'true_output': true_output,'pred_output': pred_output})
 		actual_pred_df.to_csv(os.path.join(PATH_OUTPUT,"actual_pred_df.txt"), sep='\t')
-
 		with open(os.path.join(PATH_OUTPUT,"counts.txt"), 'w') as file:
 	 		file.write(str(dict(Counter(true_output))))
 	 		file.write(str(dict(Counter(pred_output))))
@@ -596,7 +539,7 @@ def f_score(actual,predicted):
 def ord_error(actual,predicted):
 	out = 0
 	for i in range(len(actual)):
-		if(actual[i] != predicted[i]):
+		if( abs(actual[i]-predicted[i])>1 ):
 			out = out + 1
 	return float(out)/float(len(actual))
 
