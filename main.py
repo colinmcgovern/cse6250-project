@@ -55,7 +55,7 @@ fold = -1
 RUN_FOLDER = "DATA_SIZE_{}_NUM_EPOCHS_{}_MODEL_CHOICE_{}_LABEL_CHOICE_{}_USE_CF_{}_fold/".format(DATA_SIZE,NUM_EPOCHS,MODEL_CHOICE,LABEL_CHOICE,USE_CF,fold)
 PATH_OUTPUT = "output/" + RUN_FOLDER
 
-print("The output will be: {}".format(RUN_OUTPUT))
+print("The output will be: {}".format(PATH_OUTPUT))
 
 if not os.path.exists(PATH_OUTPUT):
     os.makedirs(PATH_OUTPUT)
