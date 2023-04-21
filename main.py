@@ -104,7 +104,7 @@ del d
 df=pd.read_csv(file_location)
 regex = re.compile('[^a-zA-Z\s]')
 for i in range(0,len(df)):
-	df.iloc[i][1] = regex.sub(' ', df.iloc[i][1]).replace('gt','').split()
+	df['post'][i] = regex.sub(' ', df['post'][i]).replace('gt','').split()
 
 DATA_SIZE = int(DATA_SIZE)
 if(DATA_SIZE>0):
@@ -141,29 +141,40 @@ def convert_posts(posts):
 
 class MyDataset():
 	def __init__(self,start,length,remove_mode,include_cf):
+		print("1")
 		cut_df = df
-		if(length==-1):
-			length = len(df)
 		if(remove_mode):
 			cut_df = df[0:start].append(df[start+length:len(df)])
 		else:
 			cut_df = df[start:start+length]
+		print("2")
 		x=cut_df.iloc[:,1].map(convert_posts)
+		print("3")
 		if(include_cf==1):
 			for i in range(len(cut_df)):
 				cf_vals = list(cut_df.iloc[i].iloc[3:len(cut_df.columns)])
 				cf_vals = (cf_vals + 300 * [0])[:300]
-				x.iloc[i][len(x)] = cf_vals
 				x.iloc[i] = np.vstack([x.iloc[i],cf_vals])
+				del cf_vals
+		print("4")
 		x2 = []
 		for i in x:
 			x2.append(torch.from_numpy(i))
+		print("5")
 		# self.x_train=torch.cat(x2, dim=2)
 		self.x_train=torch.stack((x2))
+		print("6")
 		self.y=cut_df.iloc[:,2].values
+		print("7")
 		self.y=[string_to_num[i] for i in self.y]
+		print("8")
 		self.y=list(filter(lambda temp:temp>=0,self.y))
+		print("9")
 		self.y_train=torch.tensor(self.y,dtype=torch.float64)
+		print("10")
+		del x
+		del x2
+		del cut_df
 	def __len__(self):
 		return len(self.y_train)
 	def __getitem__(self,idx):
@@ -280,6 +291,7 @@ def evaluate(model_param, device, data_loader, criterion, print_freq=10):
 
 
 def plot_learning_curves(train_losses, test_losses, train_accuracies, test_accuracies):
+	print("plot_learning_curves")
 	plt.figure()
 	plt.plot(np.arange(len(train_losses)), train_losses, label='Train')
 	plt.plot(np.arange(len(test_losses)), test_losses, label='Validation')
@@ -296,10 +308,11 @@ def plot_learning_curves(train_losses, test_losses, train_accuracies, test_accur
 	plt.xlabel('epoch')
 	plt.legend(loc="best")
 	plt.savefig(os.path.join(PATH_OUTPUT,"accuracies.png"),pad_inches=0)
-
+	print("plot_learning_curves saved")
 	pass
 
 def plot_confusion_matrix(results):
+	print("plot_confusion_matrix")
 	plt.clf() 
 	plt.cla() 
 	plt.rc('font', size=8)		  # controls default text sizes
@@ -328,6 +341,7 @@ def plot_confusion_matrix(results):
 	cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix = confusion_matrix, display_labels = class_names)
 	cm_display.plot()
 	plt.savefig(os.path.join(PATH_OUTPUT,"confusion.png"),pad_inches=0, dpi=199)
+	print("plot_confusion_matrix saved")
 	pass
 
 class MyCNN(nn.Module):
@@ -438,16 +452,18 @@ def fold_testing(fold=5):
 		if(start+test_len > len(df)):
 			test_len = len(df)-start+test_len
 
+		print("Making train_ds")
 		train_ds = MyDataset(start,test_len,True,USE_CF)
+		print("Making test_ds")
 		test_ds = MyDataset(start,test_len,False,USE_CF)
 		start = start + test_len
 
 		if(MODEL_CHOICE=='CNN' or MODEL_CHOICE=='FFNN'):
 			model_used = untrained_model
+			print("train_ds to loader")
 			train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
+			print("test_ds to loader")
 			test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-
-			print("train_loader")
 
 			for epoch in range(NUM_EPOCHS):
 				print("epoch: {}".format(epoch))
@@ -470,6 +486,10 @@ def fold_testing(fold=5):
 			# best_model_used = torch.load(os.path.join(PATH_OUTPUT, save_file))
 			best_model_used = model_used
 			test_loss, test_accuracy, test_results = evaluate(best_model_used, device, test_loader, criterion)
+
+			del train_ds
+			del test_ds
+			del model_used
 
 		elif(MODEL_CHOICE[0:3]=='SVM'):
 			X = train_ds.get_x()
