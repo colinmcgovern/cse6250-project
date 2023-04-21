@@ -278,7 +278,7 @@ def plot_learning_curves(train_losses, test_losses, train_accuracies, test_accur
 	plt.clf() 
 	plt.cla() 
 	plt.figure()
-	plt.plot(np.arange(len(train_accuraci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es)), train_accuracies, label='Train')
+	plt.plot(np.arange(len(test_accuracies)), train_accuracies, label='Train')
 	plt.plot(np.arange(len(test_accuracies)), test_accuracies, label='Validation')
 	plt.ylabel('Loss')
 	plt.xlabel('epoch')
