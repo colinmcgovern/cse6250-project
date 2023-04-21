@@ -296,6 +296,7 @@ def plot_learning_curves(train_losses, test_losses, train_accuracies, test_accur
 	plt.xlabel('epoch')
 	plt.legend(loc="best")
 	plt.savefig(os.path.join(PATH_OUTPUT,"accuracies.png"),pad_inches=0)
+
 	pass
 
 def plot_confusion_matrix(results):
@@ -436,6 +437,7 @@ def fold_testing(fold=5):
 		test_len = int(len(df)/fold)
 		if(start+test_len > len(df)):
 			test_len = len(df)-start+test_len
+
 		train_ds = MyDataset(start,test_len,True,USE_CF)
 		test_ds = MyDataset(start,test_len,False,USE_CF)
 		start = start + test_len
@@ -512,8 +514,7 @@ def fold_testing(fold=5):
 		print("ord_error: {}".format(ord_error(true_output,pred_output)))
 
 		actual_pred_df = pd.DataFrame({'true_output': true_output,'pred_output': pred_output})
-		actual_pred_df.to_csv(os.path.join(
-			PATH_OUTPUT,"actual_pred_df.txt"), sep='\t')
+		actual_pred_df.to_csv(os.path.join(PATH_OUTPUT,"actual_pred_df.txt"), sep='\t')
 
 		with open(os.path.join(PATH_OUTPUT,"counts.txt"), 'w') as file:
 	 		file.write(str(dict(Counter(true_output))))
