@@ -33,7 +33,7 @@ DATA_SIZE = 10
 NUM_EPOCHS = 1
 MODEL_CHOICE = "CNN"
 LABEL_CHOICE = "3+1"
-USE_CF = True
+USE_CF = 1
 
 if(len(sys.argv)!=1):
 	DATA_SIZE = int(sys.argv[1])
@@ -58,7 +58,7 @@ PATH_OUTPUT = "output/" + RUN_FOLDER
 print("The output will be: {}".format(PATH_OUTPUT))
 
 if not os.path.exists(PATH_OUTPUT):
-    os.makedirs(PATH_OUTPUT)
+	os.makedirs(PATH_OUTPUT)
 
 BATCH_SIZE = 4
 if(MODEL_CHOICE=="FFNN"):
@@ -116,6 +116,7 @@ longest_post_len = 0
 for i in range(0,len(df)):
 	if(len(df.iloc[i][1])>longest_post_len):
 		longest_post_len = len(df.iloc[i][1])
+
 print("longest_post_len: {}".format(longest_post_len))
 
 def convert_posts(posts):
@@ -128,37 +129,27 @@ def convert_posts(posts):
 
 class MyDataset():
 	def __init__(self,start,length,remove_mode,include_cf):
-		print("1")
 		cut_df = df
 		if(remove_mode):
 			cut_df = df[0:start].append(df[start+length:len(df)])
 		else:
 			cut_df = df[start:start+length]
-		print("2")
 		x=cut_df.iloc[:,1].map(convert_posts)
-		print("3")
 		if(include_cf==1):
 			for i in range(len(cut_df)):
 				cf_vals = list(cut_df.iloc[i].iloc[3:len(cut_df.columns)])
 				cf_vals = (cf_vals + 300 * [0])[:300]
 				x.iloc[i] = np.vstack([x.iloc[i],cf_vals])
 				del cf_vals
-		print("4")
 		x2 = []
 		for i in x:
 			x2.append(torch.from_numpy(i))
-		print("5")
 		# self.x_train=torch.cat(x2, dim=2)
 		self.x_train=torch.stack((x2))
-		print("6")
 		self.y=cut_df.iloc[:,2].values
-		print("7")
 		self.y=[string_to_num[i] for i in self.y]
-		print("8")
 		self.y=list(filter(lambda temp:temp>=0,self.y))
-		print("9")
 		self.y_train=torch.tensor(self.y,dtype=torch.float64)
-		print("10")
 		del x
 		del x2
 		del cut_df
@@ -292,7 +283,7 @@ def plot_learning_curves(train_losses, test_losses, train_accuracies, test_accur
 	print("plot_learning_curves saved")
 	pass
 
-def plot_confusion_matrix(results):
+def plot_confusion_matrix(results,path):
 	print("plot_confusion_matrix")
 	plt.clf() 
 	plt.cla() 
@@ -309,12 +300,12 @@ def plot_confusion_matrix(results):
 	confusion_matrix = metrics.confusion_matrix(list(out[0]),list(out[1]),normalize='true')
 	cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix = confusion_matrix, display_labels = class_names)
 	cm_display.plot()
-	plt.savefig(os.path.join(PATH_OUTPUT,"confusion_NORMALIZED.png"),pad_inches=0, dpi=199)
+	plt.savefig(os.path.join(path,"confusion_NORMALIZED.png"),pad_inches=0, dpi=199)
 	# non normalized
 	confusion_matrix = metrics.confusion_matrix(list(out[0]),list(out[1]),normalize=None)
 	cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix = confusion_matrix, display_labels = class_names)
 	cm_display.plot()
-	plt.savefig(os.path.join(PATH_OUTPUT,"confusion.png"),pad_inches=0, dpi=199)
+	plt.savefig(os.path.join(path,"confusion.png"),pad_inches=0, dpi=199)
 	print("plot_confusion_matrix saved")
 	pass
 
@@ -434,11 +425,28 @@ def fold_testing(fold=5):
 				if is_best:
 					best_val_acc = test_accuracy
 					torch.save(model_used, os.path.join(PATH_OUTPUT, save_file), _use_new_zipfile_serialization=False)
-
 			plot_learning_curves(train_losses, test_losses, train_accuracies, test_accuracies)
 			# best_model_used = torch.load(os.path.join(PATH_OUTPUT, save_file))
 			best_model_used = model_used
 			test_loss, test_accuracy, test_results = evaluate(best_model_used, device, test_loader, criterion)
+			FOLD_SAVE_PATH = os.path.join(PATH_OUTPUT,"FOLD_{}".format(i))
+			if not os.path.exists(FOLD_SAVE_PATH):
+				os.makedirs(FOLD_SAVE_PATH)
+				plot_confusion_matrix(test_results,FOLD_SAVE_PATH)
+				true_output = [i for (i, j) in test_results]
+				pred_output = [j for (i, j) in test_results]
+				actual_pred_df = pd.DataFrame({'true_output': true_output,'pred_output': pred_output})
+				actual_pred_df.to_csv(os.path.join(FOLD_SAVE_PATH,"actual_pred_df.txt"), sep='\t')
+				with open(os.path.join(FOLD_SAVE_PATH,"counts.txt"), 'w') as file:
+					file.write(str(dict(Counter(true_output))))
+					file.write(str(dict(Counter(pred_output))))
+				with open(os.path.join(FOLD_SAVE_PATH,"stats.txt"), "w") as text_file:
+					text_file.write("precision recall f_score ord_error\n")
+					precision_val = precision(true_output,pred_output)
+					recall_val = recall(true_output,pred_output)
+					f_score_val = f_score(true_output,pred_output)
+					ord_error_val = ord_error(true_output,pred_output)
+					text_file.write("{} {} {} {}".format(precision_val,recall_val,f_score_val,ord_error_val))
 			del train_ds
 			del test_ds
 			del model_used
@@ -465,7 +473,7 @@ def fold_testing(fold=5):
 			test_results = list(zip(test_ds.get_y(),predictions))
 		else:
 			exit()
-		plot_confusion_matrix(test_results)
+		plot_confusion_matrix(test_results,PATH_OUTPUT)
 		true_output = [i for (i, j) in test_results]
 		pred_output = [j for (i, j) in test_results]
 		precision_avg = precision_avg + precision(true_output,pred_output)
@@ -482,14 +490,11 @@ def fold_testing(fold=5):
 		with open(os.path.join(PATH_OUTPUT,"counts.txt"), 'w') as file:
 	 		file.write(str(dict(Counter(true_output))))
 	 		file.write(str(dict(Counter(pred_output))))
-
 	precision_avg = precision_avg / fold
 	recall_avg = recall_avg / fold
 	f_score_avg = f_score_avg / fold
 	ord_error_avg = ord_error_avg / fold
-
 	print("{} {} {} {}".format(precision_avg,recall_avg,f_score_avg,ord_error_avg))
-
 	with open(os.path.join(PATH_OUTPUT,"stats.txt"), "w") as text_file:
 		text_file.write("precision recall f_score ord_error\n")
 		text_file.write("{} {} {} {}".format(precision_avg,recall_avg,f_score_avg,ord_error_avg))
