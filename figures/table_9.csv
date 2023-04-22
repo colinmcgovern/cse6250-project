@@ -1,0 +1,5 @@
+,Approach,Input,Graded Precision,Graded Recall,F-Score,OE
+1,SVM-L,I1 (Just TF),0.9,0.68,0.77,0.17
+0,SVM-L,I2 (CF AND TF),0.9,0.67,0.77,0.17
+3,CNN,I1 (Just TF),0.88,0.69,0.78,0.21
+2,CNN,I2 (CF AND TF),0.84,0.67,0.74,0.21
