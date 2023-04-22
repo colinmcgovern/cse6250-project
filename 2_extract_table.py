@@ -30,7 +30,9 @@ for result in results:
 
 			MODEL_CHOICE = result.split("_MODEL_CHOICE_")[1].split("_")[0]
 			LABEL_CHOICE = result.split("_LABEL_CHOICE_")[1].split("_")[0]
-			USE_CF = result.split("_LABEL_CHOICE_")[0].split("_")[-1]
+			USE_CF = result.split("_USE_CF_")[1].split("_")[0]
+			print("USE_CF")
+			print(USE_CF)
 			if(USE_CF=="0"):
 				USE_FC = "I1 (Just TF)"
 			else:
@@ -55,9 +57,9 @@ for result in results:
 			else:
 				print("This should not happen..")
 
-table_7 = table_7.sort_values(by=['Approach','Input'])
-table_8 = table_8.sort_values(by=['Approach','Input'])
-table_9 = table_9.sort_values(by=['Approach','Input'])
+table_7 = table_7.sort_values(by=['Approach','Input'], ascending=[False, True])
+table_8 = table_8.sort_values(by=['Approach','Input'], ascending=[False, True])
+table_9 = table_9.sort_values(by=['Approach','Input'], ascending=[False, True])
 
 print(table_7)
 print(table_8)

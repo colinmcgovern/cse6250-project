@@ -16,7 +16,6 @@ from torch.nn.functional import relu
 from nltk.tokenize import sent_tokenize, word_tokenize
 import gensim
 from gensim.models import Word2Vec
-
 import re
 import numpy as np
 import torch.nn.functional as F
@@ -450,7 +449,7 @@ def fold_testing(fold=5):
 				is_best = test_accuracy >= best_val_acc
 				if is_best:
 					best_val_acc = test_accuracy
-					torch.save(model_used, os.path.join(PATH_OUTPUT, save_file), _use_new_zipfile_serialization=False)
+					#torch.save(model_used, os.path.join(PATH_OUTPUT, save_file), _use_new_zipfile_serialization=False)
 
 			plot_learning_curves(train_losses, test_losses, train_accuracies, test_accuracies)
 			# best_model_used = torch.load(os.path.join(PATH_OUTPUT, save_file))
