@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-results = [os.path.join(dp, f) for dp, dn, filenames in os.walk("output") for f in filenames if f == 'stats.txt']
+results = [os.path.join(dp, f) for dp, dn, filenames in os.walk("figures") for f in filenames if f == 'stats.txt']
 
 'precision','recall','f_score','ord_error'
 
