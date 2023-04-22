@@ -432,7 +432,6 @@ def fold_testing(fold=5):
 			FOLD_SAVE_PATH = os.path.join(PATH_OUTPUT,"FOLD_{}".format(i))
 			if not os.path.exists(FOLD_SAVE_PATH):
 				os.makedirs(FOLD_SAVE_PATH)
-				plot_confusion_matrix(test_results,FOLD_SAVE_PATH)
 				true_output = [i for (i, j) in test_results]
 				pred_output = [j for (i, j) in test_results]
 				actual_pred_df = pd.DataFrame({'true_output': true_output,'pred_output': pred_output})
@@ -447,6 +446,7 @@ def fold_testing(fold=5):
 					f_score_val = f_score(true_output,pred_output)
 					ord_error_val = ord_error(true_output,pred_output)
 					text_file.write("{} {} {} {}".format(precision_val,recall_val,f_score_val,ord_error_val))
+				plot_confusion_matrix(test_results,FOLD_SAVE_PATH)
 			del train_ds
 			del test_ds
 			del model_used
@@ -473,7 +473,6 @@ def fold_testing(fold=5):
 			test_results = list(zip(test_ds.get_y(),predictions))
 		else:
 			exit()
-		plot_confusion_matrix(test_results,PATH_OUTPUT)
 		true_output = [i for (i, j) in test_results]
 		pred_output = [j for (i, j) in test_results]
 		precision_avg = precision_avg + precision(true_output,pred_output)
@@ -490,6 +489,7 @@ def fold_testing(fold=5):
 		with open(os.path.join(PATH_OUTPUT,"counts.txt"), 'w') as file:
 	 		file.write(str(dict(Counter(true_output))))
 	 		file.write(str(dict(Counter(pred_output))))
+	 	plot_confusion_matrix(test_results,PATH_OUTPUT)
 	precision_avg = precision_avg / fold
 	recall_avg = recall_avg / fold
 	f_score_avg = f_score_avg / fold
