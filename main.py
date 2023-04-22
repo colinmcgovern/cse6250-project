@@ -107,6 +107,9 @@ regex = re.compile('[^a-zA-Z\s]')
 for i in range(0,len(df)):
 	df['post'][i] = regex.sub(' ', df['post'][i]).replace('gt','').split()
 
+if(LABEL_CHOICE=="4"):
+	df=df[df['label']!='Supportive']
+
 DATA_SIZE = int(DATA_SIZE)
 if(DATA_SIZE>0):
 	df = df.sample(frac=1)[0:DATA_SIZE]
@@ -148,7 +151,7 @@ class MyDataset():
 		self.x_train=torch.stack((x2))
 		self.y=cut_df.iloc[:,2].values
 		self.y=[string_to_num[i] for i in self.y]
-		self.y=list(filter(lambda temp:temp>=0,self.y))
+		# self.y=list(filter(lambda temp:temp>=0,self.y))
 		self.y_train=torch.tensor(self.y,dtype=torch.float64)
 		del x
 		del x2
