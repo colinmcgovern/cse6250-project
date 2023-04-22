@@ -487,9 +487,9 @@ def fold_testing(fold=5):
 		actual_pred_df = pd.DataFrame({'true_output': true_output,'pred_output': pred_output})
 		actual_pred_df.to_csv(os.path.join(PATH_OUTPUT,"actual_pred_df.txt"), sep='\t')
 		with open(os.path.join(PATH_OUTPUT,"counts.txt"), 'w') as file:
-	 		file.write(str(dict(Counter(true_output))))
-	 		file.write(str(dict(Counter(pred_output))))
-	 	plot_confusion_matrix(test_results,PATH_OUTPUT)
+			file.write(str(dict(Counter(true_output))))
+			file.write(str(dict(Counter(pred_output))))
+		plot_confusion_matrix(test_results,PATH_OUTPUT)
 	precision_avg = precision_avg / fold
 	recall_avg = recall_avg / fold
 	f_score_avg = f_score_avg / fold
