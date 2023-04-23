@@ -15,6 +15,9 @@ This effort is in partial completion of CSE/OAN 6250 reproducibility challenge. 
 2. Reference the associated [environment.yml](environment.yml) for a list of dependencies. Alternatively, if using Anaconda, apply the environment.yml by `conda env create --name envname --file=environment.yml`
 
 ## Usage
+1. `0_enrichment.py` is the first stage in the analysis pipeline. This has the file `500_Reddit_users_posts_labels.csv` as input and the file `reddit_data_with_cf.csv` as output.
+2. `1_main.py` is the most major step in the pipeline. This performs that model fitting and testing. Output files from this script are saved in the output folder in a folder named after the input parameters that you name the script. The input parameters are `script.py DATA_SIZE NUM_EPOCHS [SVM-RBF|SVM-L|RF|FFNN|CNN] [5|4|3+1] [USE_CF|NO_CF]`.
+3. `2_extract_table.py` this script turns data in the `figures` folder into tables 7, 8, and 9 in the paper. [^1]
 
 ## Credits
 
