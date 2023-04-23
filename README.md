@@ -13,6 +13,7 @@ This effort is in partial completion of CSE/OAN 6250 reproducibility challenge. 
 ## Installation
 1. Download or copy this repository to a local directory
 2. Reference the associated [environment.yml](environment.yml) for a list of dependencies. Alternatively, if using Anaconda, apply the environment.yml by `conda env create --name envname --file=environment.yml`
+3. The script `1_main.py` requires a file called `mini.h5` that is available for download [here](http://conceptnet.s3.amazonaws.com/precomputed-data/2016/numberbatch/19.08/mini.h5). This is precomputed word embeddings from ConceptNet. [^3] 
 
 ## Usage
 1. `0_enrichment.py` is the first stage in the analysis pipeline. This has the file `500_Reddit_users_posts_labels.csv` as input and the file `reddit_data_with_cf.csv` as output.
@@ -23,3 +24,4 @@ This effort is in partial completion of CSE/OAN 6250 reproducibility challenge. 
 
 [^1]: Manas Gaur et al., “Knowledge-Aware Assessment of Severity of Suicide Risk for Early Intervention,” Zenodo (CERN European Organization for Nuclear Research), May 13, 2019, https://doi.org/10.1145/3308558.3313698
 [^2]: https://github.com/manasgaur/Knowledge-aware-Assessment-of-Severity-of-Suicide-Risk-for-Early-Intervention
+[^3]: https://github.com/commonsense/conceptnet-numberbatch
