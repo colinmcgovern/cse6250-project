@@ -21,7 +21,6 @@ This effort is in partial completion of CSE/OAN 6250 reproducibility challenge. 
 3. `2_extract_table.py` this script turns data in the `figures` folder into tables 7, 8, and 9 in the paper. [^1]
 
 ## Credits
-
 [^1]: Manas Gaur et al., “Knowledge-Aware Assessment of Severity of Suicide Risk for Early Intervention,” Zenodo (CERN European Organization for Nuclear Research), May 13, 2019, https://doi.org/10.1145/3308558.3313698
 [^2]: https://github.com/manasgaur/Knowledge-aware-Assessment-of-Severity-of-Suicide-Risk-for-Early-Intervention
 [^3]: https://github.com/commonsense/conceptnet-numberbatch
